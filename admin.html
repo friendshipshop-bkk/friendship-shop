@@ -412,7 +412,7 @@ body:not(.stockv) .fab{display:none}
   <button data-tab="stock" class="on"><span class="i">📦</span>สต็อก</button>
   <button data-tab="sales"><span class="i">🛍️</span>หน้าขาย</button>
   <button data-tab="orders"><span class="i">🧾</span>ออเดอร์<span class="bd" style="display:none"></span></button>
-  <a class="tablink" id="shopLinkTab" href="./" target="_blank" rel="noopener"><span class="i">🛍️</span>ดูหน้าร้าน</a>
+  <a class="tablink" id="shopLinkTab" href="./"><span class="i">🛍️</span>ดูหน้าร้าน</a>
   <div class="kbd">คีย์ลัด<br><kbd>N</kbd> เพิ่มสินค้า<br><kbd>/</kbd> ค้นหา<br><kbd>1</kbd>–<kbd>3</kbd> สลับแท็บ<br><kbd>Esc</kbd> ปิดหน้าต่าง</div>
 </nav>
 
@@ -1684,5 +1684,20 @@ new MutationObserver(()=>hydrateImgs()).observe(document.body,{childList:true,su
 })();
 </script>
 
+
+<div id="shopPrev" style="display:none;position:fixed;inset:0;z-index:9999;background:#fff;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:#1d1b18;color:#fff">
+    <button id="shopPrevBack" style="border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;background:#f5b800;color:#1d1b18">‹ กลับหลังร้าน</button>
+    <span style="opacity:.8;font-size:14px">ตัวอย่างหน้าร้านที่ลูกค้าเห็น</span>
+  </div>
+  <iframe id="shopPrevFrame" title="หน้าร้าน" style="flex:1;width:100%;border:0"></iframe>
+</div>
+<script>
+(function(){
+  const box=document.getElementById("shopPrev"),fr=document.getElementById("shopPrevFrame");
+  document.getElementById("shopLinkTab").addEventListener("click",e=>{e.preventDefault();fr.src="./?preview=1";box.style.display="flex"});
+  document.getElementById("shopPrevBack").onclick=()=>{box.style.display="none";fr.src="about:blank"};
+})();
+</script>
 </body>
 </html>
