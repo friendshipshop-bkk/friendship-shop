@@ -112,7 +112,7 @@ h1{font-size:19px;margin:0;line-height:1.2}
 .log .b b{font-weight:600}
 .log .dt{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:pre-line}
 .act{font-weight:700}
-.act.add{color:var(--green)}.act.del{color:var(--red)}.act.edit{color:var(--blue)}.act.st{color:var(--amber)}
+.act.add{color:var(--green)}.act.del{color:var(--red)}.act.edit{color:var(--blue)}.act.st{color:var(--amber)}.act.loc{color:var(--blue)}
 .muted{color:var(--muted);font-size:13px}
 /* lock */
 #lock{position:fixed;inset:0;background:var(--bg);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
@@ -886,7 +886,7 @@ function renderPanel(){
       <div class="tools"><input id="pLogQ" type="search" placeholder="ค้นหารหัส / ชื่อสินค้า" value="${esc(logQ)}">
       <select id="pLogWho"><option value="">ทุกคน</option>${staff.map(s=>`<option value="${esc(s.id)}" ${s.id===sel?"selected":""}>${esc(s.name)}</option>`).join("")}</select></div>
       <div class="rows">${shown.length?shown.map(l=>`<div class="log"><div class="h"><span>${when(l.at)}</span><span>${esc(l.by)}</span></div>
-        <div class="b"><span class="act ${esc(l.kind||"")}">${esc(l.action)}</span> ${esc(l.target)}</div>${l.detail?`<div class="dt">${esc(l.detail)}</div>`:""}</div>`).join(""):'<div class="empty">ยังไม่มีประวัติ</div>'}</div>
+        <div class="b"><span class="act ${esc(l.kind||"")}">${esc(l.action)}</span> ${l.kind==="loc"&&/^-?[0-9.]+,-?[0-9.]+$/.test(l.target||"")?`<a href="https://www.google.com/maps?q=${esc(l.target)}" target="_blank" rel="noopener">📍 ดูบนแผนที่</a>`:esc(l.target)}</div>${l.detail?`<div class="dt">${esc(l.detail)}</div>`:""}</div>`).join(""):'<div class="empty">ยังไม่มีประวัติ</div>'}</div>
       <p class="muted" style="margin-top:10px">แสดง 500 รายการล่าสุด</p>`;
     const qi=p.querySelector("#pLogQ");qi.oninput=()=>{logQ=qi.value;const pos=qi.selectionStart;renderPanel();const n=$("panel").querySelector("#pLogQ");n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}};
     p.querySelector("#pLogWho").onchange=renderPanel;
@@ -1584,11 +1584,26 @@ function syncAccess(){
     me={id:m.email,email:m.email,name:m.name,role:m.role,owner:cfgStaff.owner===m.email};
     BE.setRole(m.role);applyAccess();
     $("meName").textContent=m.name;$("meAv").textContent=(m.name||"?").trim().charAt(0).toUpperCase();
-    hideLock();startData();
+    hideLock();startData();checkIn();
   }else{me=null;applyAccess();showLock()}
   if(panelView==="staff"||panelView==="menu"||panelView==="logs")renderPanel();
 }
 function logout(){closeSheet();closePanel();BE&&BE.B.auth.logout()}
+/* ---------- location check-in when the app is opened ---------- */
+let checkedIn=false,hiddenAt=0;
+function checkIn(){
+  if(checkedIn||!me)return;checkedIn=true;
+  const send=async(lat,lng,acc,note)=>{try{const BEo=await window.__beReady;await BEo.rpc("fs_checkin",{p_lat:lat,p_lng:lng,p_acc:acc,p_note:note||""})}catch(_){}};
+  if(!navigator.geolocation){send(null,null,null,"เครื่องไม่รองรับตำแหน่ง");return}
+  navigator.geolocation.getCurrentPosition(
+    p=>send(p.coords.latitude,p.coords.longitude,Math.round(p.coords.accuracy||0)),
+    e=>send(null,null,null,e&&e.code===1?"ไม่อนุญาตให้เข้าถึงตำแหน่ง":"หาตำแหน่งไม่ได้"),
+    {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){hiddenAt=Date.now();return}
+  if(hiddenAt&&Date.now()-hiddenAt>10*60000){checkedIn=false;checkIn()}
+});
 async function saveStaffCfg(members){
   const arr=r=>members.filter(m=>m.role===r).map(m=>m.email);
   const admins=arr("admin");if(!admins.includes(cfgStaff.owner)){toast("เจ้าของร้านต้องเป็นผู้ดูแลเสมอ");return false}
