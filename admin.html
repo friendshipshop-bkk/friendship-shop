@@ -573,7 +573,9 @@ const auth={
   onChange(cb){sb.auth.getSession().then(({data})=>cb(U(data.session)));const {data}=sb.auth.onAuthStateChange((ev,s)=>{if(ev==="PASSWORD_RECOVERY")window.__fsRecovery=true;if(ev!=="TOKEN_REFRESHED")cb(U(s))});return ()=>data.subscription.unsubscribe()},
   async login(e,p){const {error}=await sb.auth.signInWithPassword({email:e,password:p});if(error)throw mapErr(error)},
   async signup(e,p){const {data,error}=await sb.auth.signUp({email:e,password:p,options:{emailRedirectTo:adminUrl()}});if(error)throw mapErr(error);if(!data.session){const o=new Error("confirm");o.code="auth/confirm-email";throw o}},
-  logout:()=>sb.auth.signOut(),
+  logout:async()=>{try{await sb.auth.signOut({scope:"local"})}catch(_){}
+    try{Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k))}catch(_){}
+    location.reload()},
   async reset(e){const {error}=await sb.auth.resetPasswordForEmail(e,{redirectTo:adminUrl()});if(error)throw mapErr(error)},
   async updatePassword(p){const {error}=await sb.auth.updateUser({password:p});if(error)throw mapErr(error)},
 };
