@@ -59,7 +59,7 @@ nav.bottom .bd{position:absolute;top:4px;left:calc(50% + 6px);background:var(--r
 .back{border:none;background:none;color:var(--muted);cursor:pointer;padding:0 0 6px;font-size:14px}
 .gal{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:18px;scrollbar-width:none;background:var(--soft)}
 .gal::-webkit-scrollbar{display:none}
-.big{flex:0 0 100%;aspect-ratio:1;scroll-snap-align:center;background:var(--soft) center/contain no-repeat;display:grid;place-items:center;font-size:60px;color:#d0c7b5}
+.big{flex:0 0 100%;aspect-ratio:1;max-height:min(380px,38vh);scroll-snap-align:center;background:var(--soft) center/contain no-repeat;display:grid;place-items:center;font-size:60px;color:#d0c7b5}
 .dots{display:flex;justify-content:center;gap:5px;margin-top:8px}.dots i{width:7px;height:7px;border-radius:50%;background:#ddd3c0}.dots i.on{background:var(--pink)}
 .price{font-size:22px;font-weight:700;color:var(--pink-d)}
 .spec{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
@@ -258,7 +258,7 @@ function render(){
       <input class="inp" id="q" placeholder="🔍 ค้นหาสินค้า" value="${esc(st.q)}" style="margin-bottom:10px">
       <div class="chips"><button class="chip ${!st.cat?"on":""}" data-cat="">ทั้งหมด</button>${cats.map(c=>`<button class="chip ${st.cat===c?"on":""}" data-cat="${esc(c)}">${esc(c)}</button>`).join("")}</div>
       <div class="grid">${shown.length?shown.map(p=>{const a=avail(p);return `<button class="card" data-p="${esc(p.id)}"><div class="ph" ${img(photosOf(p)[0],"t")}>${photosOf(p)[0]?"":"📦"}${a<=0?'<span class="tagx">สินค้าหมด</span>':a<=lowOf(p)?`<span class="tagx low">เหลือ ${a} ชิ้น</span>`:""}</div>
-        <div class="t">${esc(p.name)}</div><div class="d">${esc(p.size||"")}</div><div class="p">${baht(p.price)}</div></button>`}).join(""):`<div class="empty">${products.length?"ไม่พบสินค้า":"ยังไม่มีสินค้า"}</div>`}</div>`;
+        <div class="t">${esc(p.name)}</div><div class="d">${hasV(p)?`เลือกได้ ${vlist(p).filter(v=>vavail(v)>0).length} แบบ`:esc(p.size||"")}</div><div class="p">${baht(p.price)}</div></button>`}).join(""):`<div class="empty">${products.length?"ไม่พบสินค้า":"ยังไม่มีสินค้า"}</div>`}</div>`;
   }
   else if(st.view==="detail"){
     const p=products.find(x=>x.id===st.detail);
