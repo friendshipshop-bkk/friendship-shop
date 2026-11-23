@@ -320,6 +320,11 @@ body:not(.stockv) .fab{display:none}
 .thumb{position:relative}.thumb .pn{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;border-radius:999px;padding:0 5px}
 .qtyrow{display:flex;gap:6px}.qtyrow input{flex:1;min-width:0}
 .qinfo{font-size:12px;color:var(--muted);margin-top:2px}
+.vhead,.vrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 64px 34px;gap:6px;align-items:center}
+.vhead{font-size:12px;color:var(--muted);margin-bottom:4px}.vrow{margin-bottom:6px}.vrow input{min-width:0;width:100%}
+.vrow .vx{border:none;background:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px}
+.vres{grid-column:1/-1;font-size:11.5px;color:var(--amber);margin:-3px 0 2px}
+.vlist{font-size:12px;color:var(--muted);margin-top:2px;white-space:normal}
 .switch.full{grid-column:1/-1}
 .step{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;width:max-content}
 .step button{border:none;background:#f3eee4;width:38px;height:40px;font-size:18px;cursor:pointer}
@@ -438,6 +443,11 @@ body:not(.stockv) .fab{display:none}
         <div class="qinfo" id="qtyInfo"></div>
       </div>
       <div class="f"><label>เตือนเมื่อเหลือไม่เกิน (ชิ้น)</label><input id="fLow" type="number" inputmode="numeric" min="0"></div>
+      <div class="f full"><label>ตัวเลือกสินค้า: ไซซ์ / สี / รุ่น <span class="muted">(ไม่บังคับ แยกสต็อกแต่ละแบบ)</span></label>
+        <div id="vRows"></div>
+        <button class="btn sm ghost" id="vAdd" type="button">＋ เพิ่มตัวเลือก</button>
+        <div class="qinfo" id="vInfo"></div>
+      </div>
       <div class="profit" id="profitHint"></div>
       <label class="switch full"><input type="checkbox" id="fActive" checked> แสดงในหน้าขายและแอปลูกค้า</label>
       <div class="f full"><label>รายละเอียดสำหรับลูกค้า (ใส่ในแคปชันและแอปลูกค้า)</label><textarea id="fDesc"></textarea></div>
@@ -480,9 +490,9 @@ if(!conn||!window.supabase){setTimeout(()=>document.dispatchEvent(new CustomEven
 const sb=supabase.createClient(conn.url,conn.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const T={items:{t:"fs_products",pk:"id"},orders:{t:"fs_orders",pk:"code"},sales:{t:"fs_sales",pk:"id"},logs:{t:"fs_logs",pk:"id"}};
 const COLS={
-  fs_products:["id","code","name","category","brand","size","price","qty","reserved","low","active","descr","photos","photo_id","created_at","created_by","created_by_id","updated_at","updated_by","updated_by_id","last_in_at"],
+  fs_products:["id","code","name","category","brand","size","price","qty","reserved","low","active","descr","photos","photo_id","created_at","created_by","created_by_id","updated_at","updated_by","updated_by_id","last_in_at","variants"],
   fs_orders:["code","name","phone","address","note","items","subtotal","shipping","total","status","slip_id","slip_at","created_at","expires_at","updated_at","updated_by","channel","stock_state","history","carrier","tracking_no","cancel_reason","label_printed","lease"],
-  fs_sales:["id","item_id","code","name","category","qty","price","cost","total","channel","sold_at","at","sold_by","sold_by_id","order_id"],
+  fs_sales:["id","item_id","code","name","category","qty","price","cost","total","channel","sold_at","at","sold_by","sold_by_id","order_id","vid"],
   fs_logs:["id","at","by","by_id","action","kind","target","detail"]};
 const snake=k=>k==="desc"?"descr":k==="_lease"?"lease":k.replace(/[A-Z]/g,m=>"_"+m.toLowerCase());
 const camel=k=>k==="descr"?"desc":k==="lease"?"_lease":k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase());
@@ -623,6 +633,8 @@ async function log(action,kind,target,detail){
 const LABEL={code:"รหัส",category:"หมวด",name:"ชื่อ",brand:"แบรนด์",size:"ไซซ์/สี",cost:"ทุน",price:"ราคาขาย",qty:"สต็อก",low:"เตือนใกล้หมด",active:"แสดงในร้าน",desc:"รายละเอียดลูกค้า",note:"หมายเหตุ",photos:"รูป"};
 function diff(a,b){
   const out=[];
+  const vn=x=>JSON.stringify(vlist(x).map(v=>[v.id,vlabel(v),num(v.qty)]));
+  if(vn(a)!==vn(b))out.push("ตัวเลือก: "+(hasV(b)?vlist(b).map(v=>vlabel(v)+" "+num(v.qty)).join(", "):"ไม่มี"));
   for(const k of Object.keys(LABEL)){
     if(k==="photos"){const x=JSON.stringify(photosOf(a)),y=JSON.stringify(b.photos||[]);if(x!==y)out.push(`แก้ไขรูป (${(b.photos||[]).length} รูป)`);continue}
     if(k==="active"){if((a.active!==false)!==(b.active!==false))out.push(`แสดงในร้าน: ${b.active!==false?"เปิด":"ปิด"}`);continue}
@@ -660,6 +672,22 @@ async function addCat(name){
 
 /* ---------- stock helpers ---------- */
 const avail=it=>Math.max(0,num(it.qty)-num(it.reserved));
+const vlist=it=>Array.isArray(it&&it.variants)?it.variants:[];
+const hasV=it=>vlist(it).length>0;
+const vlabel=v=>[v.size,v.color].map(x=>(x||"").trim()).filter(Boolean).join(" · ");
+const vavail=v=>Math.max(0,num(v.qty)-num(v.reserved));
+const vsum=(vs,k)=>vs.reduce((t,v)=>t+num(v[k]),0);
+const vid=()=>"v"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+/* change stock of an item (or one of its options) from a fresh read; totals stay in step with the options */
+async function moveStock(itemId,vId,dq,dr,extra){
+  const ref=db.collection("items").doc(itemId);const d=await ref.get();if(!d.exists)return null;
+  const cur={id:itemId,...d.data()};const up={...(extra||{})};
+  if(vId&&hasV(cur)){
+    const vs=vlist(cur).map(v=>v.id===vId?{...v,qty:Math.max(0,num(v.qty)+dq),reserved:Math.max(0,num(v.reserved)+dr)}:v);
+    up.variants=vs;up.qty=vsum(vs,"qty");up.reserved=vsum(vs,"reserved");
+  }else{up.qty=Math.max(0,num(cur.qty)+dq);up.reserved=Math.max(0,num(cur.reserved)+dr)}
+  await ref.update(up);return {...cur,...up};
+}
 const lowOf=it=>it.low!=null&&it.low!==""?num(it.low):(appSettings.lowStock!=null?num(appSettings.lowStock):3);
 const photosOf=it=>Array.isArray(it.photos)&&it.photos.length?it.photos:(it.photoId?[it.photoId]:[]);
 const cover=it=>photosOf(it)[0]||null;
@@ -715,7 +743,7 @@ function render(){
     const idle=filter==="aging"?`<div class="d" style="color:var(--amber)">ไม่มีขาย ${idleDays(it,lsm)} วัน · ทุนจม ${baht(num(it.qty)*num(it.cost))}</div>`:"";
     const res=num(it.reserved)?` · จอง ${num(it.reserved)}`:"";
     return `<button class="item" data-id="${esc(it.id)}"><div class="thumb" ${bg(c)}>${c?(n>1?`<span class="pn">${n}</span>`:""):"📦"}</div>
-      <div class="meta"><div class="t">${it.active===false?'<span class="muted">[ซ่อน]</span> ':""}${esc(it.name||"(ไม่มีชื่อ)")}</div><div class="d">${d||esc(it.category||"")}</div>${idle}</div>
+      <div class="meta"><div class="t">${it.active===false?'<span class="muted">[ซ่อน]</span> ':""}${esc(it.name||"(ไม่มีชื่อ)")}</div><div class="d">${d||esc(it.category||"")}</div>${hasV(it)?`<div class="vlist">${vlist(it).map(v=>esc(vlabel(v))+" <b>"+vavail(v)+"</b>").join(" · ")}</div>`:""}${idle}</div>
       <span class="xc">${esc(it.category||"-")}</span><span class="xc">${num(it.qty)} ชิ้น${res}</span>
       <div class="right"><div class="price">${baht(it.price)}</div>${stockPill(it)}</div>
       <span class="xc by">${esc(it.updatedBy||it.createdBy||"-")}${it.updatedAt?" · "+when(it.updatedAt):""}</span></button>`;
@@ -782,6 +810,7 @@ function openSheet(it){
   $("fActive").checked=it?it.active!==false:true;
   $("fNote").value=it?.note||"";$("fDesc").value=it?.desc||"";
   gal=it?photosOf(it).slice():[];renderGal();profitHint();
+  vEdit=vlist(it).map(v=>({...v}));renderV();
   $("delBtn").style.display=it?"":"none";$("lblBtn").style.display=it?"":"none";$("delBtn").textContent="ลบ";delArmed=false;
   const a=[];
   if(it?.createdBy)a.push(`เพิ่มโดย <b>${esc(it.createdBy)}</b> · ${when(it.createdAt)}`);
@@ -809,6 +838,31 @@ $("restockOk").onclick=async e=>{
   }catch(_){toast("บันทึกไม่สำเร็จ")}
   $("restockOk").disabled=false;
 };
+let vEdit=[];
+function renderV(){
+  const box=$("vRows");
+  box.innerHTML=vEdit.length?'<div class="vhead"><span>ไซซ์</span><span>สี / รุ่น</span><span>จำนวน</span><span></span></div>'+vEdit.map((v,i)=>`<div class="vrow" data-vi="${i}">
+    <input data-vk="size" value="${esc(v.size||"")}" placeholder="เช่น M"><input data-vk="color" value="${esc(v.color||"")}" placeholder="เช่น ดำ">
+    <input data-vk="qty" type="number" inputmode="numeric" min="0" value="${num(v.qty)}"><button class="vx" type="button" data-vdel="${i}" aria-label="ลบตัวเลือก">✕</button>
+    ${num(v.reserved)?`<div class="vres">จองในออเดอร์ ${num(v.reserved)} · ขายได้ ${vavail(v)}</div>`:""}</div>`).join(""):"";
+  const on=vEdit.length>0;
+  $("fQty").disabled=on||!canWrite;$("restockBtn").style.display=on||!editing?"none":"";
+  if(on){$("fQty").value=vsum(vEdit,"qty");$("restockRow").classList.remove("show")}
+  $("qtyLbl").textContent=on?"รวมทุกตัวเลือก":editing?"จำนวนในสต็อก":"จำนวนเริ่มต้น";
+  $("vInfo").textContent=on?`${vEdit.length} แบบ · รวม ${vsum(vEdit,"qty")} ชิ้น · ราคาเท่ากันทุกแบบ`:"เช่น เสื้อ M ดำ 5 ตัว, L ดำ 3 ตัว ลูกค้าจะเลือกแบบได้ตอนสั่ง";
+  $("vAdd").style.display=canWrite?"":"none";
+}
+$("vAdd").onclick=e=>{e.preventDefault();
+  if(!vEdit.length&&editing&&num(editing.reserved)>0){toast("สินค้านี้มีออเดอร์ค้างอยู่ รอออเดอร์จบก่อนค่อยแยกตัวเลือก");return}
+  const last=vEdit[vEdit.length-1];
+  vEdit.push({id:vid(),size:last?last.size:($("fSize").value.trim()||""),color:"",qty:vEdit.length?0:Math.max(0,Math.floor(num($("fQty").value))),reserved:0});
+  renderV();const r=$("vRows").querySelectorAll(".vrow");const inp=r[r.length-1]&&r[r.length-1].querySelector('[data-vk="color"]');if(inp)inp.focus()};
+$("vRows").addEventListener("input",e=>{const k=e.target.dataset.vk;if(!k)return;const i=+e.target.closest(".vrow").dataset.vi;
+  vEdit[i][k]=k==="qty"?Math.max(0,Math.floor(num(e.target.value))):e.target.value;
+  if(k==="qty"){$("fQty").value=vsum(vEdit,"qty");$("vInfo").textContent=`${vEdit.length} แบบ · รวม ${vsum(vEdit,"qty")} ชิ้น · ราคาเท่ากันทุกแบบ`}});
+$("vRows").addEventListener("click",e=>{const b=e.target.closest("[data-vdel]");if(!b)return;e.preventDefault();const i=+b.dataset.vdel;
+  if(num(vEdit[i].reserved)>0){toast("ตัวเลือกนี้มีออเดอร์ค้างอยู่ ลบไม่ได้");return}
+  vEdit.splice(i,1);renderV()});
 $("saveBtn").onclick=async()=>{
   if(!db||uploading||!me||!canWrite)return;
   const now=Date.now();
@@ -819,19 +873,35 @@ $("saveBtn").onclick=async()=>{
     note:$("fNote").value.trim(),desc:$("fDesc").value.trim(),photos:gal.slice(),photoId:gal[0]||null,
     updatedAt:now,updatedBy:me.name,updatedById:me.id,
   };
-  const qtyNew=Math.max(0,Math.floor(num($("fQty").value)));
+  let qtyNew=Math.max(0,Math.floor(num($("fQty").value)));
   if(!data.name&&!data.code){toast("ใส่ชื่อหรือรหัสสินค้าก่อน");return}
+  if(vEdit.length){
+    if(vEdit.some(v=>!vlabel(v))){toast("ใส่ไซซ์หรือสีให้ครบทุกแถว");return}
+    const labs=vEdit.map(v=>vlabel(v).toLowerCase());if(new Set(labs).size!==labs.length){toast("มีตัวเลือกซ้ำกัน");return}
+  }
   if(data.code&&items.some(i=>i.code===data.code&&(!editing||i.id!==editing.id))){toast("รหัสนี้ซ้ำกับสินค้าอื่น");return}
   $("saveBtn").disabled=true;
   try{
     if(editing){
-      const qtyChanged=qtyNew!==openQty;
+      const fresh=(await db.collection("items").doc(editing.id).get()).data()||{};
+      if(vEdit.length){
+        const fr=vlist(fresh);
+        data.variants=vEdit.map(v=>{const f=fr.find(x=>x.id===v.id);return {id:v.id,size:(v.size||"").trim(),color:(v.color||"").trim(),qty:num(v.qty),reserved:f?num(f.reserved):0}});
+        const lost=fr.filter(f=>num(f.reserved)>0&&!data.variants.some(v=>v.id===f.id));
+        if(lost.length||(!fr.length&&num(fresh.reserved)>0)){toast("มีออเดอร์ค้างอยู่ในตัวเลือกที่ลบ ลองใหม่หลังออเดอร์จบ");$("saveBtn").disabled=false;return}
+        qtyNew=vsum(data.variants,"qty");data.reserved=vsum(data.variants,"reserved");
+      }else if(hasV(fresh)){
+        if(num(fresh.reserved)>0){toast("มีออเดอร์ค้างอยู่ ลบตัวเลือกทั้งหมดไม่ได้ตอนนี้");$("saveBtn").disabled=false;return}
+        data.variants=[];
+      }
+      const qtyChanged=qtyNew!==openQty||!!data.variants;
       if(qtyChanged)data.qty=qtyNew;
       const ch=diff(editing,{...editing,...data});
       if(!ch.length){toast("ไม่มีอะไรเปลี่ยน");$("saveBtn").disabled=false;closeSheet();return}
       await db.collection("items").doc(editing.id).update(data);
       log(qtyChanged&&ch.length===1?"ปรับสต็อก":"แก้ไข",qtyChanged&&ch.length===1?"st":"edit",ilabel(data),ch.join("\n"));
     }else{
+      if(vEdit.length){data.variants=vEdit.map(v=>({id:v.id,size:(v.size||"").trim(),color:(v.color||"").trim(),qty:num(v.qty),reserved:0}));qtyNew=vsum(data.variants,"qty")}
       await db.collection("items").doc().set({...data,qty:qtyNew,reserved:0,lastInAt:now,createdAt:now,createdBy:me.name,createdById:me.id});
       log("เพิ่มสินค้า","add",ilabel(data),[data.category,baht(data.price),qtyNew+" ชิ้น"].join(" · "));
     }
@@ -983,7 +1053,8 @@ function caption(it){
   const S=appSettings,L=[];
   L.push(`✨ ${it.name||"สินค้า"} ✨`);
   if(S.capBrand!==false&&it.brand)L.push(`🏷️ แบรนด์: ${it.brand}`);
-  if(it.size)L.push(`📏 ${it.size}`);
+  if(hasV(it)){const ok=vlist(it).filter(v=>vavail(v)>0);if(ok.length)L.push(`📏 มีให้เลือก: ${ok.map(vlabel).join(", ")}`)}
+  else if(it.size)L.push(`📏 ${it.size}`);
   if(it.desc)L.push(`💬 ${it.desc}`);
   L.push(`💰 ราคา ${nf(it.price)} บาท`);
   const a=avail(it);L.push(a<=lowOf(it)?`📦 เหลือเพียง ${a} ชิ้น!`:"📦 มีของพร้อมส่ง");
@@ -1037,8 +1108,8 @@ $("scards").addEventListener("click",e=>{
   if(a==="preview"){panelCtx={text:caption(it),label:"แคปชัน",item:it};openPanel("cap");return}
   if(a==="sell"&&canWrite){panelCtx={item:it,channel:"Facebook",n:1};openPanel("sell")}
 });
-async function addSale(it,n,price,channel,date,orderId){
-  await db.collection("sales").doc().set({itemId:it.id,code:it.code||"",name:it.name||"",category:it.category||"",qty:n,price:num(price),cost:num(it.cost),total:n*num(price),
+async function addSale(it,n,price,channel,date,orderId,vId){
+  await db.collection("sales").doc().set({itemId:it.id,vid:vId||null,code:it.code||"",name:it.name||"",category:it.category||"",qty:n,price:num(price),cost:num(it.cost),total:n*num(price),
     channel,soldAt:date||today(),at:Date.now(),soldBy:me?me.name:"",soldById:me?me.id:null,orderId:orderId||null});
 }
 function periodRange(p){
@@ -1085,8 +1156,7 @@ $("salesSum").addEventListener("click",async e=>{
   const u=e.target.closest("[data-undo]");if(!u||!canWrite)return;e.preventDefault();
   if(!u.dataset.armed){u.dataset.armed="1";u.textContent="ยืนยันยกเลิก? (คืนของเข้าสต็อก)";return}
   const s=sales.find(x=>x.id===u.dataset.undo);if(!s)return;
-  try{const ref=db.collection("items").doc(s.itemId);const d=await ref.get();
-    if(d.exists)await ref.update({qty:num(d.data().qty)+(num(s.qty)||1),updatedAt:Date.now(),updatedBy:me.name});
+  try{await moveStock(s.itemId,s.vid,num(s.qty)||1,0,{updatedAt:Date.now(),updatedBy:me.name});
     await db.collection("sales").doc(s.id).delete();
     log("ยกเลิกรายการขาย","del",`[${s.code}] ${s.name}`,`× ${num(s.qty)||1} · ${baht(s.total)} · คืนเข้าสต็อก`);toast("ยกเลิกแล้ว คืนของเข้าสต็อก")}catch(_){toast("ยกเลิกไม่สำเร็จ")}
 });
@@ -1101,9 +1171,13 @@ function renderSalesPanel(p){
     return true;
   }
   if(panelView==="sell"){
-    const cur=items.find(i=>i.id===it.id)||it,a=avail(cur),n=Math.min(panelCtx.n||1,Math.max(1,a));
+    const cur=items.find(i=>i.id===it.id)||it;
+    if(hasV(cur)&&!vlist(cur).some(v=>v.id===panelCtx.vid))panelCtx.vid=(vlist(cur).find(v=>vavail(v)>0)||vlist(cur)[0]).id;
+    const cv=hasV(cur)?vlist(cur).find(v=>v.id===panelCtx.vid):null;
+    const a=cv?vavail(cv):avail(cur),n=Math.min(panelCtx.n||1,Math.max(1,a));
     p.innerHTML=head("บันทึกการขาย")+`<p style="margin:0 0 12px"><b>${esc(cur.code||"")}</b> ${esc(cur.name||"")}<br><span class="muted">ราคาตั้ง ${baht(cur.price)} · ทุน ${baht(cur.cost)} · ขายได้ ${a} ชิ้น</span></p>
       <div class="grid">
+        ${cv?`<div class="f full"><label>ตัวเลือก</label><select id="sellV">${vlist(cur).map(v=>`<option value="${esc(v.id)}" ${v.id===cv.id?"selected":""} ${vavail(v)>0?"":"disabled"}>${esc(vlabel(v))} · ขายได้ ${vavail(v)}</option>`).join("")}</select></div>`:""}
         <div class="f"><label>จำนวน</label><div class="step"><button data-sn="-1">−</button><input id="sellN" type="number" inputmode="numeric" min="1" max="${a}" value="${n}"><button data-sn="1">＋</button></div></div>
         <div class="f"><label>ราคาต่อชิ้น (บาท)</label><input id="sellPrice" type="number" inputmode="decimal" value="${esc(panelCtx.price??cur.price??"")}"></div>
         <div class="f full"><label>ขายผ่านช่องทาง</label><div class="chch" id="sellCh">${CHANNELS.map(c=>`<button data-ch="${c}" class="${panelCtx.channel===c?"on":""}">${c}</button>`).join("")}</div></div>
@@ -1113,6 +1187,7 @@ function renderSalesPanel(p){
       <div class="actions"><button class="btn ghost" data-close>ยกเลิก</button><button class="btn grow" style="background:var(--green);color:#fff" data-sact="dosell">✓ ยืนยันขาย (ตัดสต็อก)</button></div>`;
     const upd=()=>{$("sellTot").textContent=baht(num($("sellN").value)*num($("sellPrice").value))};
     $("sellN").oninput=upd;$("sellPrice").oninput=upd;
+    const sv=$("sellV");if(sv)sv.onchange=()=>{panelCtx.vid=sv.value;panelCtx.n=num($("sellN").value);panelCtx.price=$("sellPrice").value;renderPanel()};
     return true;
   }
   if(panelView==="salesset"){
@@ -1149,11 +1224,15 @@ $("panel").addEventListener("click",async e=>{
     const n=Math.floor(num($("sellN").value)),price=num($("sellPrice").value),date=$("sellDate").value||today(),chn=panelCtx.channel||"อื่นๆ";
     if(n<1){toast("ใส่จำนวน");return}
     t.disabled=true;
-    try{const ref=db.collection("items").doc(it.id);const d=await ref.get();const cur={id:it.id,...d.data()};
-      if(avail(cur)<n){toast(`ขายได้แค่ ${avail(cur)} ชิ้น`);t.disabled=false;return}
-      await ref.update({qty:num(cur.qty)-n,updatedAt:Date.now(),updatedBy:me.name,updatedById:me.id});
-      await addSale(cur,n,price,chn,date,null);
-      log("ขาย","st",ilabel(cur),`× ${n} · ${baht(n*price)} · ${chn} · คงเหลือ ${num(cur.qty)-n}`);
+    try{const d=await db.collection("items").doc(it.id).get();const cur={id:it.id,...d.data()};
+      const v=hasV(cur)?vlist(cur).find(x=>x.id===panelCtx.vid):null;
+      if(hasV(cur)&&!v){toast("เลือกตัวเลือกก่อน");t.disabled=false;return}
+      const can=v?vavail(v):avail(cur);
+      if(can<n){toast(`ขายได้แค่ ${can} ชิ้น`);t.disabled=false;return}
+      const up=await moveStock(it.id,v?v.id:null,-n,0,{updatedAt:Date.now(),updatedBy:me.name,updatedById:me.id});
+      const nm=v?`${cur.name||""} (${vlabel(v)})`:cur.name;
+      await addSale({...cur,name:nm},n,price,chn,date,null,v?v.id:null);
+      log("ขาย","st",v?`${ilabel(cur)} (${vlabel(v)})`:ilabel(cur),`× ${n} · ${baht(n*price)} · ${chn} · คงเหลือ ${num(up.qty)}`);
       toast("บันทึกการขายแล้ว 🎉");closePanel()}catch(_){toast("บันทึกไม่สำเร็จ");t.disabled=false}
     return;
   }
@@ -1269,15 +1348,14 @@ async function setOrderStatus(o,to,extra,note,byName){
   const hist=[...(o.history||[]),{s:to,at:now,by,note:note||""}];
   let stockState=o.stockState||"reserved";
   if(to==="paid"&&stockState==="reserved"){
-    for(const l of (o.items||[])){const it=await getItem(l.id);if(!it)continue;const n=lineQty(l);
-      await db.collection("items").doc(it.id).update({qty:Math.max(0,num(it.qty)-n),reserved:Math.max(0,num(it.reserved)-n),updatedAt:now,updatedBy:by});
-      await addSale({...it,cost:it.cost},n,l.price,"แอปลูกค้า",today(),o.code)}
+    for(const l of (o.items||[])){const n=lineQty(l);const it=await moveStock(l.id,l.vid,-n,-n,{updatedAt:now,updatedBy:by});if(!it)continue;
+      await addSale({...it,cost:it.cost,name:l.name||it.name},n,l.price,"แอปลูกค้า",today(),o.code,l.vid)}
     stockState="deducted";
   }
   if(to==="cancelled"){
-    if(stockState==="reserved"){for(const l of (o.items||[])){const it=await getItem(l.id);if(it)await db.collection("items").doc(it.id).update({reserved:Math.max(0,num(it.reserved)-lineQty(l)),updatedAt:now,updatedBy:by})}}
+    if(stockState==="reserved"){for(const l of (o.items||[]))await moveStock(l.id,l.vid,0,-lineQty(l),{updatedAt:now,updatedBy:by})}
     else if(stockState==="deducted"){
-      for(const l of (o.items||[])){const it=await getItem(l.id);if(it)await db.collection("items").doc(it.id).update({qty:num(it.qty)+lineQty(l),updatedAt:now,updatedBy:by})}
+      for(const l of (o.items||[]))await moveStock(l.id,l.vid,lineQty(l),0,{updatedAt:now,updatedBy:by})
       try{const sn=await db.collection("sales").where("orderId","==",o.code).get();for(const d of sn.docs)await db.collection("sales").doc(d.id).delete()}catch(_){}
     }
     stockState="released";
