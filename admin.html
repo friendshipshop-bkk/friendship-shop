@@ -592,7 +592,7 @@ const auth={
 const store={watchDoc:(p,cb,err)=>{const d=cfgDoc(p.split("/")[1]);return d.onSnapshot(s=>cb({exists:s.exists,data:s.data()}),err)}};
 const rpc=async(fn,args)=>chkw(await sb.rpc(fn,args||{}));
 window.__beResolve({sb,DEMO:false,conn,B:{auth,store},fetchImage,rpc,setRole:r=>{role=r},
-  claimOwner:(name,app)=>rpc("fs_claim_owner",{p_name:name,p_app:app}),saveStaff:m=>rpc("fs_save_staff",{p_members:m}),
+  claimOwner:(name,app)=>rpc("fs_claim_owner",{p_name:name,p_app:app}),saveStaff:m=>rpc("fs_save_staff",{p_members:m}),saveHub:(m,u)=>rpc("fs_save_hub",{p_members:m,p_mala:u}),
   use:n=>n==="db"?db:n==="assets"?assets:n==="downloads"?downloads:n==="user"?user:null});
 })();
 </script>
@@ -933,6 +933,7 @@ function renderPanel(){
     p.innerHTML=head(`สวัสดี ${esc(me?.name||"")}`)+`<div class="menu">
       <button class="mrow" data-go="cats"><span class="ic">🏷️</span><span class="lb">หมวดหมู่สินค้า</span><span class="hint">${cats.length} หมวด</span></button>
       <button class="mrow" data-go="logs"><span class="ic">🕘</span><span class="lb">ประวัติการแก้ไข</span><span class="hint">ใครทำอะไร</span></button>
+      ${me&&me.owner?`<button class="mrow" data-go="hub"><span class="ic">🧩</span><span class="lb">แอพรวม (ร้านเสื้อผ้า + หม่าล่า)</span><span class="hint">ใครเข้าได้</span></button>`:""}
       ${isAdmin()?`<button class="mrow" data-go="staff"><span class="ic">👥</span><span class="lb">พนักงานและสิทธิ์</span><span class="hint">${staff.filter(s=>s.active!==false).length} คน</span></button>`:""}
       ${isAdmin()?`<button class="mrow" data-go="salesset"><span class="ic">🛍️</span><span class="lb">ตั้งค่าหน้าขาย / สั่งซื้อ</span><span class="hint" ${bankMissing()?'style="color:var(--red);font-weight:600"':""}>${bankMissing()?"⚠️ ยังไม่ตั้งบัญชีโอน":"บัญชีโอน, ค่าส่ง"}</span></button>`:""}
       <button class="mrow" data-act="shoplink"><span class="ic">🔗</span><span class="lb">ลิงก์หน้าร้านสำหรับลูกค้า</span><span class="hint">คัดลอก</span></button>
@@ -979,6 +980,33 @@ function renderPanel(){
       </div>`).join("")}</div>
       <div class="card" style="margin-top:12px"><h3>สิทธิ์แต่ละแบบ</h3><div class="muted" style="line-height:1.7">• <b>ผู้ดูแล</b> ทำได้ทุกอย่าง จัดการพนักงานและตั้งค่าร้าน<br>• <b>พนักงาน</b> ลง/แก้สินค้า ขาย จัดการออเดอร์<br>• <b>ผู้ชม</b> ดูได้อย่างเดียว</div></div>`;
   }
+  else if(panelView==="hub"){
+    if(hubCfg===undefined){p.innerHTML=head("แอพรวม",true)+'<div class="empty">กำลังโหลด…</div>';loadHub();return}
+    if(hubCfg===null){p.innerHTML=head("แอพรวม",true)+'<div class="empty">ยังไม่ได้เปิดระบบแอพรวมในฐานข้อมูล<br>รันคำสั่ง SQL ของแอพรวมใน Supabase ก่อน</div>';return}
+    const AP={both:"ทั้งสองร้าน",shop:"ร้านเสื้อผ้า",mala:"หม่าล่า"};
+    const key=a=>a.includes("shop")&&a.includes("mala")?"both":a.includes("mala")?"mala":"shop";
+    const mem=hubCfg.members||[];
+    p.innerHTML=head("แอพรวม",true)+`
+      <p class="muted" style="margin-top:-4px">แอพเดียวที่เปิดได้ทั้งหลังร้านเสื้อผ้าและแอพหม่าล่า เข้าได้เฉพาะคนที่อยู่ในรายชื่อนี้ ข้างในแต่ละแอพยังมีล็อกอินของตัวเองเหมือนเดิม</p>
+      <div class="actions" style="margin:4px 0 14px"><button class="btn primary grow" data-act="hublink">📋 คัดลอกลิงก์แอพรวม</button></div>
+      <div class="grid">
+        <div class="f full"><label>อีเมล (ต้องสมัครบัญชีร้านด้วยอีเมลนี้)</label><input id="hEmail" type="email" inputmode="email" placeholder="name@gmail.com"></div>
+        <div class="f"><label>ชื่อที่แสดง</label><input id="hName" placeholder="เช่น ต้น"></div>
+        <div class="f"><label>เห็นแอพ</label><select id="hApps"><option value="both">ทั้งสองร้าน</option><option value="mala">หม่าล่า</option><option value="shop">ร้านเสื้อผ้า</option></select></div>
+      </div>
+      <div class="actions" style="margin-top:10px"><button class="btn ghost grow" data-act="addhub">＋ เพิ่มคนเข้าแอพรวม</button></div>
+      <div class="rows" style="margin-top:12px">
+        <div class="row srole"><div class="lb">${esc(me.name)} <span class="muted">(คุณ)</span> <span class="tag">เจ้าของร้าน</span><div class="s">${esc(me.email)}</div><span class="tag">ทั้งสองร้าน</span></div></div>
+        ${mem.filter(m=>m.email!==me.email).map(m=>`<div class="row srole"><div class="lb">${esc(m.name||m.email)}<div class="s">${esc(m.email)}</div>
+          <select class="rsel" data-happ="${esc(m.email)}">${Object.entries(AP).map(([k,v])=>`<option value="${k}" ${key(m.apps||[])===k?"selected":""}>${v}</option>`).join("")}</select></div>
+          <button class="btn sm danger" data-act="rmhub" data-id="${esc(m.email)}">นำออก</button></div>`).join("")}
+      </div>
+      <div class="f full" style="margin-top:14px"><label>ลิงก์แอพหม่าล่า</label><input id="hMala" value="${esc(hubCfg.malaUrl||MALA_DEFAULT)}"></div>
+      <div class="actions" style="margin-top:8px"><button class="btn sm ghost" data-act="savemala">บันทึกลิงก์หม่าล่า</button></div>`;
+    p.querySelectorAll("[data-happ]").forEach(sel=>sel.onchange=async()=>{
+      const m=(hubCfg.members||[]).map(x=>x.email===sel.dataset.happ?{...x,apps:sel.value==="both"?["shop","mala"]:[sel.value]}:x);
+      await saveHub(m);toast("บันทึกแล้ว")});
+  }
   else if(panelView==="mypin"){
     p.innerHTML=head("เปลี่ยนรหัสของฉัน",true)+`<div class="grid">
       <div class="f full"><label>รหัสเดิม</label><input id="mOld" type="password" inputmode="numeric" maxlength="6"></div>
@@ -1017,6 +1045,22 @@ $("panel").addEventListener("click",async e=>{
     const c=cats[i];const n=cats.filter((_,j)=>j!==i);
     try{await saveCats(n);cats=n;log("ลบหมวด","del",c);fillCatSelects();toast("ลบหมวดแล้ว (สินค้าเดิมยังอยู่)");renderPanel()}catch(_){toast("ลบไม่สำเร็จ")}return;
   }
+  if(a==="hublink"){copyText(hubLink(),"ลิงก์แอพรวม");return}
+  if(a==="addhub"){
+    const email=$("hEmail").value.trim().toLowerCase(),name=$("hName").value.trim()||email.split("@")[0],v=$("hApps").value;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("ใส่อีเมลให้ถูกต้อง");return}
+    const mem=(hubCfg.members||[]).slice();if(email===me.email||mem.some(m=>m.email===email)){toast("มีอีเมลนี้แล้ว");return}
+    mem.push({email,name,apps:v==="both"?["shop","mala"]:[v]});t.disabled=true;
+    if(await saveHub(mem)){log("ให้สิทธิ์แอพรวม","add",name,email);toast("เพิ่ม "+name+" แล้ว")}
+    t.disabled=false;return;
+  }
+  if(a==="rmhub"){
+    if(!t.dataset.armed){t.dataset.armed="1";t.textContent="ยืนยัน?";return}
+    const mem=(hubCfg.members||[]).filter(m=>m.email!==t.dataset.id);
+    if(await saveHub(mem)){log("เอาสิทธิ์แอพรวมออก","del",t.dataset.id,"");toast("นำออกแล้ว")}return;
+  }
+  if(a==="savemala"){const u=$("hMala").value.trim();if(!/^https:\/\//.test(u)){toast("ลิงก์ต้องขึ้นต้นด้วย https://");return}
+    if(await saveHub(hubCfg.members||[],u))toast("บันทึกลิงก์หม่าล่าแล้ว");return}
   if(a==="addstaff"){
     const email=$("sEmail").value.trim().toLowerCase(),name=$("sName").value.trim()||email.split("@")[0],role=$("sRole").value;
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("ใส่อีเมลให้ถูกต้อง");return}
@@ -1201,6 +1245,8 @@ function renderSalesPanel(p){
         <div class="f"><label>ธนาคาร</label><input id="ssBank" value="${esc(appSettings.bankName||"")}" placeholder="เช่น กสิกรไทย"></div>
         <div class="f"><label>เลขบัญชี</label><input id="ssAcc" value="${esc(appSettings.bankAcc||"")}" placeholder="xxx-x-xxxxx-x"></div>
         <div class="f"><label>ชื่อบัญชี</label><input id="ssHolder" value="${esc(appSettings.bankHolder||"")}"></div>
+        <div class="f"><label>พร้อมเพย์ (เบอร์โทรหรือเลขบัตรประชาชน)</label><input id="ssPP" inputmode="numeric" value="${esc(appSettings.promptpay||"")}" placeholder="เช่น 0812345678"></div>
+        <div class="f"><label>ชื่อบัญชีพร้อมเพย์ (ให้ลูกค้าเห็น)</label><input id="ssPPName" value="${esc(appSettings.ppName||"")}" placeholder="เช่น ร้าน Friendship Shop"></div>
         <div class="f"><label>ค่าส่งต่อออเดอร์ (บาท)</label><input id="ssShip" type="number" inputmode="decimal" value="${esc(shipFee())}"></div>
         <div class="f"><label>ยกเลิกอัตโนมัติถ้าไม่โอนใน (นาที)</label><input id="ssWin" type="number" inputmode="numeric" min="5" value="${esc(payWin())}"></div>
         <div class="f"><label>เตือนใกล้หมดเมื่อเหลือ ≤ (ชิ้น)</label><input id="ssLow" type="number" inputmode="numeric" min="0" value="${esc(appSettings.lowStock!=null?appSettings.lowStock:3)}"></div>
@@ -1237,8 +1283,10 @@ $("panel").addEventListener("click",async e=>{
     return;
   }
   if(a==="savess"){
+    const ppd=$("ssPP").value.replace(/\D/g,"");
+    if(ppd&&!((ppd.length===10&&ppd[0]==="0")||ppd.length===13||ppd.length===15)){toast("พร้อมเพย์ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลขบัตรประชาชน 13 หลัก");return}
     try{await saveSettings({lineUrl:$("ssLine").value.trim(),capFooter:$("ssFoot").value,capBrand:$("ssBrand").checked,
-      bankName:$("ssBank").value.trim(),bankAcc:$("ssAcc").value.trim(),bankHolder:$("ssHolder").value.trim(),shipFee:num($("ssShip").value),
+      bankName:$("ssBank").value.trim(),bankAcc:$("ssAcc").value.trim(),bankHolder:$("ssHolder").value.trim(),promptpay:$("ssPP").value.replace(/\D/g,""),ppName:$("ssPPName").value.trim(),shipFee:num($("ssShip").value),
       payWindowMin:Math.max(5,Math.floor(num($("ssWin").value))),lowStock:Math.max(0,Math.floor(num($("ssLow").value))),
       carriers:$("ssCarr").value.split(",").map(x=>x.trim()).filter(Boolean),senderText:$("ssSender").value.trim()});
       log("แก้ตั้งค่าหน้าขาย","edit","ตั้งค่าร้าน");toast("บันทึกแล้ว");render();renderPanel()}catch(_){toast("บันทึกไม่สำเร็จ")}
@@ -1268,7 +1316,7 @@ const itemsLine=o=>(o.items||[]).map(i=>`• [${i.code||"-"}] ${i.name} × ${lin
 const itemsCount=o=>(o.items||[]).reduce((s,i)=>s+lineQty(i),0);
 
 /* ---------- shop: orders tab ---------- */
-const bankMissing=()=>!String(appSettings.bankAcc||"").trim();
+const bankMissing=()=>!String(appSettings.bankAcc||"").trim()&&!String(appSettings.promptpay||"").trim();
 function bankWarnHTML(){return bankMissing()?`<div class="warnbox bankwarn"><span>⚠️ ยังไม่ได้ตั้ง<b>เลขบัญชีรับโอน</b> ลูกค้าจะไม่รู้ว่าต้องโอนเข้าบัญชีไหน${isAdmin()?"":" แจ้งผู้ดูแลร้านให้ตั้งค่า"}</span>${isAdmin()?'<button class="btn sm primary" data-gobank>ตั้งค่าเลย</button>':""}</div>`:""}
 document.addEventListener("click",e=>{if(e.target.closest("[data-gobank]")){openPanel("salesset")}});
 function renderOrders(){
@@ -1693,6 +1741,13 @@ async function saveStaffCfg(members){
 function readOnly(){baseWrite=false;applyAccess()}
 const shopLink=()=>location.origin+location.pathname.replace(/admin\.html$/,"")+fsConnParams();
 const staffLink=()=>location.origin+location.pathname+fsConnParams();
+const hubLink=()=>location.origin+location.pathname.replace(/admin\.html$/,"")+"hub.html"+fsConnParams();
+const MALA_DEFAULT="https://damza56.github.io/Friendship/#u=https://mihfmrlbdcjbssqjqqyo.supabase.co&k=sb_publishable_sxn3eiUFfQtwn_sepZ4j2w_7jxJNIoH";
+let hubCfg=undefined;
+async function loadHub(){try{const BEo=await window.__beReady;const r=await BEo.sb.from("fs_config").select("data").eq("id","hub").maybeSingle();
+  hubCfg=r.error?null:(r.data?r.data.data:null)}catch(_){hubCfg=null}if(panelView==="hub")renderPanel()}
+async function saveHub(members,url){try{const BEo=await window.__beReady;const d=await BEo.saveHub(members,url||"");hubCfg=d;renderPanel();return true}
+  catch(err){toast("บันทึกไม่สำเร็จ");return false}}
 
 /* ---------- boot ---------- */
 fillCatSelects();
