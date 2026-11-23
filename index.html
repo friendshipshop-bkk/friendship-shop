@@ -40,6 +40,7 @@ nav.bottom .bd{position:absolute;top:4px;left:calc(50% + 6px);background:var(--r
 .vchip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer}
 .vchip.on{border:2px solid var(--pink);background:#fde6ec;color:var(--pink-d);padding:6px 13px;font-weight:600}
 .vchip.out{color:#b5afa5;border-style:dashed;text-decoration:line-through}
+.vchip.soft{color:#9a9184;border-style:dashed;background:#faf7f0}.vchip.soft.on{color:var(--pink-d)}
 .vleft{font-size:13px;color:var(--muted);margin:6px 0 2px}
 .qr{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;text-align:center;margin:10px 0}
 .qr .pp{display:inline-block;background:#113566;color:#fff;font-weight:700;font-size:13px;border-radius:6px;padding:3px 10px;margin-bottom:8px}
@@ -193,21 +194,25 @@ function qrHTML(amount,code){const pl=ppPayload(settings.promptpay,amount);if(!p
     return `<div class="qr"><span class="pp">PromptPay พร้อมเพย์</span><img src="${q.createDataURL(6,4)}" alt="QR พร้อมเพย์ ยอด ${baht(amount)}">
       <div class="amt">${baht(amount)}</div><div class="hint">${code?"ออเดอร์ "+esc(code)+" · ":""}สแกนด้วยแอพธนาคาร ยอดเงินขึ้นให้อัตโนมัติ<br>หรือกดค้างที่รูปเพื่อบันทึก แล้วเปิดจากแอพธนาคาร</div>
       ${settings.ppName?`<div class="hint" style="margin-top:4px">ชื่อบัญชี: ${esc(settings.ppName)}</div>`:""}</div>`}catch(_){return ""}}
+/* option keys: sizes compared without case (2XL = 2Xl), shown in the usual size order */
+const SZ=["XXS","XS","S","M","L","XL","XXL","2XL","XXXL","3XL","4XL","5XL","6XL","FREE","FREESIZE"];
+const skey=v=>vtrim(v.size).toUpperCase(),ckey=v=>vtrim(v.color);
+function szSort(a,b){const A=a.replace(/\s/g,""),B=b.replace(/\s/g,"");const ia=SZ.indexOf(A),ib=SZ.indexOf(B);
+  if(ia>=0&&ib>=0)return ia-ib;const na=parseFloat(A),nb=parseFloat(B);if(!isNaN(na)&&!isNaN(nb))return na-nb;if(ia>=0)return -1;if(ib>=0)return 1;return 0}
 function vstate(p){
-  const vs=vlist(p),sizes=[...new Set(vs.map(v=>vtrim(v.size)).filter(Boolean))],colors=[...new Set(vs.map(v=>vtrim(v.color)).filter(Boolean))];
-  const v=vs.find(x=>vtrim(x.size)===(st.vs||"")&&vtrim(x.color)===(st.vc||""))||null;
+  const vs=vlist(p),sizes=[...new Set(vs.map(skey).filter(Boolean))].sort(szSort),colors=[...new Set(vs.map(ckey).filter(Boolean))];
+  const v=vs.find(x=>skey(x)===(st.vs||"")&&ckey(x)===(st.vc||""))||null;
   return {vs,sizes,colors,v};
 }
 function vinit(p){
   const vs=vlist(p);if(!vs.length){st.vs=st.vc="";return}
-  const f=vs.find(v=>vavail(v)>0)||vs[0];st.vs=vtrim(f.size);st.vc=vtrim(f.color);
+  const f=vs.find(v=>vavail(v)>0)||vs[0];st.vs=skey(f);st.vc=ckey(f);
 }
 function vselect(p,dim,val){
-  const vs=vlist(p);
-  if(dim==="s"){st.vs=val;const ok=vs.find(v=>vtrim(v.size)===val&&vtrim(v.color)===st.vc&&vavail(v)>0);
-    if(!ok){const f=vs.find(v=>vtrim(v.size)===val&&vavail(v)>0)||vs.find(v=>vtrim(v.size)===val);if(f)st.vc=vtrim(f.color)}}
-  else{st.vc=val;const ok=vs.find(v=>vtrim(v.color)===val&&vtrim(v.size)===st.vs&&vavail(v)>0);
-    if(!ok){const f=vs.find(v=>vtrim(v.color)===val&&vavail(v)>0)||vs.find(v=>vtrim(v.color)===val);if(f)st.vs=vtrim(f.size)}}
+  const vs=vlist(p),K=dim==="s"?skey:ckey,O=dim==="s"?ckey:skey;
+  const keep=dim==="s"?st.vc:st.vs;if(dim==="s")st.vs=val;else st.vc=val;
+  if(vs.find(v=>K(v)===val&&O(v)===keep&&vavail(v)>0))return;
+  const f=vs.find(v=>K(v)===val&&vavail(v)>0)||vs.find(v=>K(v)===val);if(f){if(dim==="s")st.vc=ckey(f);else st.vs=skey(f)}
 }
 const lowOf=p=>p.low!=null&&p.low!==""?num(p.low):(settings.lowStock!=null?num(settings.lowStock):3);
 const payWin=()=>settings.payWindowMin!=null?Math.max(5,num(settings.payWindowMin)):60;
@@ -267,8 +272,11 @@ function render(){
     const VS=vstate(p),cv=hasV(p)?VS.v:null;
     const a=hasV(p)?(cv?vavail(cv):0):avail(p),inCart=(cart.find(l=>l.id===p.id&&(l.vid||"")===(cv?cv.id:""))||{}).qty||0,maxAdd=Math.max(0,a-inCart),ph=photosOf(p);
     const chips=(lbl,dim,vals)=>vals.length?`<div class="vopt"><div class="lb">${lbl}</div><div class="row">${vals.map(x=>{
-      const any=VS.vs.some(v=>vtrim(dim==="s"?v.size:v.color)===x&&vavail(v)>0);const on=(dim==="s"?st.vs:st.vc)===x;
-      return `<button class="vchip ${on?"on":""} ${any?"":"out"}" data-vd="${dim}" data-vv="${esc(x)}" ${any?"":"disabled"}>${esc(x)}${any?"":" · หมด"}</button>`}).join("")}</div></div>`:"";
+      const K=dim==="s"?skey:ckey,O=dim==="s"?ckey:skey,other=dim==="s"?st.vc:st.vs,twoDim=VS.sizes.length&&VS.colors.length;
+      const any=VS.vs.some(v=>K(v)===x&&vavail(v)>0),on=(dim==="s"?st.vs:st.vc)===x;
+      const combo=!twoDim||VS.vs.some(v=>K(v)===x&&O(v)===other&&vavail(v)>0);
+      const note=!any?" · หมด":combo?"":(dim==="s"?" · สีนี้หมด":" · ไซซ์นี้หมด");
+      return `<button class="vchip ${on?"on":""} ${any?(combo?"":"soft"):"out"}" data-vd="${dim}" data-vv="${esc(x)}" ${any?"":"disabled"}>${esc(x)}${note}</button>`}).join("")}</div></div>`:"";
     const vhtml=hasV(p)?chips("ไซซ์","s",VS.sizes)+chips(VS.sizes.length?"สี / รุ่น":"ตัวเลือก","c",VS.colors)
       +`<div class="vleft">${cv?`${esc(vlabel(cv))} · ${a>0?`เหลือ ${a} ชิ้น`:"แบบนี้หมดแล้ว"}`:"แบบนี้ไม่มี ลองเลือกแบบอื่น"}</div>`:"";
     st.dq=Math.max(1,Math.min(st.dq,maxAdd||1));

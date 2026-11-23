@@ -679,6 +679,7 @@ const hasV=it=>vlist(it).length>0;
 const vlabel=v=>[v.size,v.color].map(x=>(x||"").trim()).filter(Boolean).join(" · ");
 const vavail=v=>Math.max(0,num(v.qty)-num(v.reserved));
 const vsum=(vs,k)=>vs.reduce((t,v)=>t+num(v[k]),0);
+const nsz=x=>{x=(x||"").trim().replace(/\s+/g," ");return /^[\x20-\x7E]+$/.test(x)?x.toUpperCase():x};
 const vid=()=>"v"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 /* change stock of an item (or one of its options) from a fresh read; totals stay in step with the options */
 async function moveStock(itemId,vId,dq,dr,extra){
@@ -880,7 +881,7 @@ $("saveBtn").onclick=async()=>{
   if(!data.name&&!data.code){toast("ใส่ชื่อหรือรหัสสินค้าก่อน");return}
   if(vEdit.length){
     if(vEdit.some(v=>!vlabel(v))){toast("ใส่ไซซ์หรือสีให้ครบทุกแถว");return}
-    const labs=vEdit.map(v=>vlabel(v).toLowerCase());if(new Set(labs).size!==labs.length){toast("มีตัวเลือกซ้ำกัน");return}
+    const labs=vEdit.map(v=>(nsz(v.size)+"|"+(v.color||"").trim()).toLowerCase());if(new Set(labs).size!==labs.length){toast("มีตัวเลือกซ้ำกัน");return}
   }
   if(data.code&&items.some(i=>i.code===data.code&&(!editing||i.id!==editing.id))){toast("รหัสนี้ซ้ำกับสินค้าอื่น");return}
   $("saveBtn").disabled=true;
@@ -889,7 +890,7 @@ $("saveBtn").onclick=async()=>{
       const fresh=(await db.collection("items").doc(editing.id).get()).data()||{};
       if(vEdit.length){
         const fr=vlist(fresh);
-        data.variants=vEdit.map(v=>{const f=fr.find(x=>x.id===v.id);return {id:v.id,size:(v.size||"").trim(),color:(v.color||"").trim(),qty:num(v.qty),reserved:f?num(f.reserved):0}});
+        data.variants=vEdit.map(v=>{const f=fr.find(x=>x.id===v.id);return {id:v.id,size:nsz(v.size),color:(v.color||"").trim(),qty:num(v.qty),reserved:f?num(f.reserved):0}});
         const lost=fr.filter(f=>num(f.reserved)>0&&!data.variants.some(v=>v.id===f.id));
         if(lost.length||(!fr.length&&num(fresh.reserved)>0)){toast("มีออเดอร์ค้างอยู่ในตัวเลือกที่ลบ ลองใหม่หลังออเดอร์จบ");$("saveBtn").disabled=false;return}
         qtyNew=vsum(data.variants,"qty");data.reserved=vsum(data.variants,"reserved");
@@ -904,7 +905,7 @@ $("saveBtn").onclick=async()=>{
       await db.collection("items").doc(editing.id).update(data);
       log(qtyChanged&&ch.length===1?"ปรับสต็อก":"แก้ไข",qtyChanged&&ch.length===1?"st":"edit",ilabel(data),ch.join("\n"));
     }else{
-      if(vEdit.length){data.variants=vEdit.map(v=>({id:v.id,size:(v.size||"").trim(),color:(v.color||"").trim(),qty:num(v.qty),reserved:0}));qtyNew=vsum(data.variants,"qty")}
+      if(vEdit.length){data.variants=vEdit.map(v=>({id:v.id,size:nsz(v.size),color:(v.color||"").trim(),qty:num(v.qty),reserved:0}));qtyNew=vsum(data.variants,"qty")}
       await db.collection("items").doc().set({...data,qty:qtyNew,reserved:0,lastInAt:now,createdAt:now,createdBy:me.name,createdById:me.id});
       log("เพิ่มสินค้า","add",ilabel(data),[data.category,baht(data.price),qtyNew+" ชิ้น"].join(" · "));
     }
