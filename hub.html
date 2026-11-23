@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Friendship แอพรวม</title>
+<meta name="theme-color" content="#1f1b16">
+<link rel="manifest" href="manifest-hub.json">
+<link rel="apple-touch-icon" href="hub-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Friendship">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f4efe4;--ink:#1f1b16;--mut:#6f675c;--card:#fff;--line:#e6dfd1;--y:#f5b800;--yd:#7a5800;--ys:#fff4d1;--r:#d8402b;--rd:#8f2414;--rs:#fde5df;--red:#c63d2f}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "IBM Plex Sans Thai",system-ui,sans-serif;overflow:hidden}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--y);outline-offset:2px}
+.page{height:100%;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 24px);max-width:560px;margin:0 auto}
+.hide{display:none!important}
+.top{display:flex;align-items:center;gap:12px;margin:8px 0 18px}
+.logo{width:52px;height:52px;border-radius:14px;background:#fff url(hub-192.png) center/cover;color:transparent;flex:none;box-shadow:0 0 0 1px var(--line)}
+.top b{display:block;font-size:18px;line-height:1.2}.top small{color:var(--mut);font-size:13px}
+.top .out{margin-left:auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-size:13px}
+h1{font-size:24px;margin:6px 0 4px}
+.muted{color:var(--mut);font-size:14px}
+label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
+input{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;font-size:16px}
+.btn{border:0;border-radius:14px;padding:13px 16px;font-weight:600;min-height:48px;width:100%}
+.btn.pri{background:var(--ink);color:#fff;margin-top:16px}
+.btn.gh{background:#ebe4d6;margin-top:8px}
+.err{color:var(--red);font-size:14px;min-height:20px;margin-top:8px}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.tiles.one{grid-template-columns:minmax(0,1fr)}
+.tile{border:0;border-radius:22px;padding:18px 16px;min-height:190px;display:flex;flex-direction:column;justify-content:space-between;text-align:left}
+.tile .ic{width:50px;height:50px;border-radius:15px;display:grid;place-items:center}
+.tile b{font-size:18px;display:block}.tile .s{font-size:13px}
+.badge{align-self:flex-start;background:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+.t-shop{background:var(--ys);color:var(--yd)}.t-shop .ic{background:var(--y);color:#3a2a00}
+.t-mala{background:var(--rs);color:var(--rd)}.t-mala .ic{background:var(--r);color:#fff}
+.tip{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--mut)}
+#appv{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+.bar{display:flex;gap:6px;align-items:center;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:var(--ink)}
+.bar .home{border:0;background:#3a342c;color:#fff;border-radius:50%;width:40px;height:40px;flex:none;display:grid;place-items:center}
+.pill{flex:1;border:0;background:#3a342c;color:#f3eee6;border-radius:999px;padding:9px 6px;font-size:14px;font-weight:600;white-space:nowrap}
+.pill.on.shop{background:var(--y);color:#3a2a00}.pill.on.mala{background:var(--r);color:#fff}
+.bar a{color:#f3eee6;font-size:12.5px;white-space:nowrap;text-decoration:none;border:1px solid #57504a;border-radius:999px;padding:8px 10px;flex:none}
+.frames{flex:1;position:relative}
+.frames iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+</style>
+</head>
+<body>
+<div class="page" id="pLoad"><p class="muted" style="margin-top:40vh;text-align:center">กำลังโหลด…</p></div>
+
+<div class="page hide" id="pLogin">
+  <div class="top"><div class="logo">FS</div><div><b>Friendship</b><small>แอพรวม ร้านเสื้อผ้า + หม่าล่า</small></div></div>
+  <h1>เข้าสู่ระบบ</h1>
+  <p class="muted">ใช้อีเมลและรหัสผ่านเดียวกับหลังร้าน Friendship Shop</p>
+  <label for="lgEmail">อีเมล</label><input id="lgEmail" type="email" inputmode="email" autocomplete="username">
+  <label for="lgPw">รหัสผ่าน</label><input id="lgPw" type="password" autocomplete="current-password">
+  <div class="err" id="lgErr"></div>
+  <button class="btn pri" id="lgIn">เข้าสู่ระบบ</button>
+  <button class="btn gh" id="lgUp">สมัครบัญชีใหม่</button>
+  <p class="muted" style="margin-top:14px">ถ้ายังไม่มีบัญชี ให้เจ้าของร้านเพิ่มอีเมลของคุณในเมนู “แอพรวม” ก่อน แล้วกดสมัครบัญชีใหม่ด้วยอีเมลนั้น</p>
+</div>
+
+<div class="page hide" id="pDeny">
+  <div class="top"><div class="logo">FS</div><div><b>Friendship</b><small id="dnWho"></small></div></div>
+  <h1>ยังไม่มีสิทธิ์เข้าแอพรวม</h1>
+  <p class="muted">บัญชีนี้ยังไม่อยู่ในรายชื่อ ขอให้เจ้าของร้านเพิ่มอีเมลนี้ที่หลังร้าน → เมนู → แอพรวม แล้วเปิดแอพนี้ใหม่</p>
+  <button class="btn gh" id="dnRe">ลองใหม่</button>
+  <button class="btn gh" data-out>ออกจากระบบ</button>
+</div>
+
+<div class="page hide" id="pHome">
+  <div class="top"><div class="logo">FS</div><div><b>Friendship</b><small id="hmWho"></small></div><button class="out" data-out>ออกจากระบบ</button></div>
+  <div class="tiles" id="tiles"></div>
+  <div class="tip">กดเข้าแอพแล้วสลับร้านได้จากแถบด้านบน ครั้งแรกที่เปิดหม่าล่า ต้องล็อกอินด้วยรหัสพนักงานของแอพหม่าล่า</div>
+</div>
+
+<div id="appv" class="hide">
+  <div class="bar">
+    <button class="home" id="goHome" aria-label="กลับหน้าแรก"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9h-6v-6H9v6H3z"/></svg></button>
+    <span id="pills" style="display:contents"></span>
+    <a id="full" href="#" target="_blank" rel="noopener">เปิดเต็มจอ ↗</a>
+  </div>
+  <div class="frames" id="frames"></div>
+</div>
+
+<script>
+{
+const FS_URL="https://ltqkshjaqvnxgqzvwzji.supabase.co", FS_KEY="sb_publishable_AKvoAdYct_xk5jcVBsfo4w_lTt38L1M";
+const MALA_DEFAULT="https://damza56.github.io/Friendship/#u=https://mihfmrlbdcjbssqjqqyo.supabase.co&k=sb_publishable_sxn3eiUFfQtwn_sepZ4j2w_7jxJNIoH";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const icShirt='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z"/></svg>';
+const icBowl='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M9 7c0-2 2-2 2-4M14 7c0-2 2-2 2-4"/></svg>';
+const APPS={shop:{name:"ร้านเสื้อผ้า",sub:"สต็อก · ออเดอร์ · ขาย",cls:"t-shop",ic:icShirt},mala:{name:"หม่าล่า",sub:"เข้างาน · ออกงาน",cls:"t-mala",ic:icBowl}};
+let sb=null,user=null,allowed=[],malaUrl=MALA_DEFAULT,cur=null,frames={};
+function show(id){["pLoad","pLogin","pDeny","pHome"].forEach(x=>$(x).classList.toggle("hide",x!==id));$("appv").classList.add("hide")}
+function msg(e){const m=String(e&&e.message||e||"");
+  if(/invalid login/i.test(m))return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+  if(/already registered|already been registered/i.test(m))return "อีเมลนี้สมัครแล้ว กดเข้าสู่ระบบได้เลย";
+  if(/rate limit|too many|security purposes/i.test(m))return "ลองหลายครั้งเกินไป รอสักครู่แล้วลองใหม่";
+  if(/not confirmed/i.test(m))return "ยังไม่ได้ยืนยันอีเมล เปิดอีเมลแล้วกดลิงก์ยืนยันก่อน";
+  if(/password/i.test(m))return "รหัสผ่านต้องมีอย่างน้อย 6 ตัว";
+  return "ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง"}
+async function load(){
+  show("pLoad");
+  const {data}=await sb.auth.getSession();user=data.session&&data.session.user;
+  if(!user){show("pLogin");return}
+  const email=(user.email||"").toLowerCase();
+  const [st,hb]=await Promise.all([sb.from("fs_config").select("data").eq("id","staff").maybeSingle(),sb.from("fs_config").select("data").eq("id","hub").maybeSingle()]);
+  const staff=st.data&&st.data.data||{},hub=hb.data&&hb.data.data||{};
+  if(hub.malaUrl)malaUrl=hub.malaUrl;
+  if(staff.owner&&staff.owner===email)allowed=["shop","mala"];
+  else{const m=(hub.members||[]).find(x=>(x.email||"").toLowerCase()===email);allowed=m?(m.apps||[]).filter(a=>APPS[a]):[]}
+  const nm=((staff.members||[]).find(x=>x.email===email)||(hub.members||[]).find(x=>x.email===email)||{}).name||email;
+  if(!allowed.length){$("dnWho").textContent=email;show("pDeny");return}
+  $("hmWho").textContent="สวัสดี "+nm;
+  $("tiles").className="tiles"+(allowed.length===1?" one":"");
+  $("tiles").innerHTML=allowed.map(a=>`<button class="tile ${APPS[a].cls}" data-app="${a}"><span class="ic">${APPS[a].ic}</span><span><b>${APPS[a].name}</b><span class="s">${APPS[a].sub}</span></span><span class="badge" id="bd-${a}" style="display:none"></span></button>`).join("");
+  show("pHome");
+  if(allowed.includes("shop")){try{const r=await sb.from("fs_orders").select("code",{count:"exact",head:true}).eq("status","checking");
+    if(r.count){const b=$("bd-shop");b.textContent=r.count+" รอตรวจสลิป";b.style.display=""}}catch(_){}}
+  const want=(location.hash.match(/^#(shop|mala)$/)||[])[1];if(want&&allowed.includes(want))open(want);
+}
+function srcOf(a){return a==="shop"?"admin.html":malaUrl}
+function open(a){
+  if(!allowed.includes(a))return;cur=a;
+  if(!frames[a]){const f=document.createElement("iframe");f.src=srcOf(a);f.title=APPS[a].name;
+    f.setAttribute("allow","geolocation; camera; clipboard-write");$("frames").appendChild(f);frames[a]=f}
+  Object.entries(frames).forEach(([k,f])=>f.style.visibility=k===a?"visible":"hidden");
+  $("pills").innerHTML=allowed.length>1?allowed.map(x=>`<button class="pill ${x} ${x===a?"on":""}" data-app="${x}">${APPS[x].name}</button>`).join(""):`<span class="pill on ${a}" style="text-align:center">${APPS[a].name}</span>`;
+  $("full").href=new URL(srcOf(a),location.href).href;
+  ["pLoad","pLogin","pDeny","pHome"].forEach(x=>$(x).classList.add("hide"));$("appv").classList.remove("hide");
+  try{history.replaceState(null,"","#"+a)}catch(_){}
+}
+function goHome(){$("appv").classList.add("hide");show("pHome");try{history.replaceState(null,"",location.pathname+location.search)}catch(_){}}
+document.addEventListener("click",async e=>{
+  const ap=e.target.closest("[data-app]");if(ap){open(ap.dataset.app);return}
+  if(e.target.closest("#goHome")){goHome();return}
+  if(e.target.closest("[data-out]")){try{await sb.auth.signOut({scope:"local"})}catch(_){}
+    try{Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k))}catch(_){}
+    location.replace(location.pathname);return}
+});
+async function auth(kind){
+  const email=$("lgEmail").value.trim().toLowerCase(),password=$("lgPw").value;$("lgErr").textContent="";
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){$("lgErr").textContent="ใส่อีเมลให้ถูกต้อง";return}
+  if(password.length<6){$("lgErr").textContent="รหัสผ่านต้องมีอย่างน้อย 6 ตัว";return}
+  const b=$(kind==="in"?"lgIn":"lgUp");b.disabled=true;
+  try{const r=kind==="in"?await sb.auth.signInWithPassword({email,password}):await sb.auth.signUp({email,password});
+    if(r.error)throw r.error;
+    if(kind==="up"&&!r.data.session){$("lgErr").textContent="สมัครแล้ว เปิดอีเมลเพื่อกดยืนยัน แล้วกลับมาเข้าสู่ระบบ";b.disabled=false;return}
+    await load()}catch(err){$("lgErr").textContent=msg(err)}
+  b.disabled=false;
+}
+$("lgIn").onclick=()=>auth("in");$("lgUp").onclick=()=>auth("up");
+$("lgPw").addEventListener("keydown",e=>{if(e.key==="Enter")auth("in")});
+$("dnRe").onclick=load;
+if(!window.supabase){$("pLoad").innerHTML='<p class="muted" style="margin-top:40vh;text-align:center">โหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วเปิดใหม่</p>'}
+else{sb=supabase.createClient(FS_URL,FS_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});load().catch(()=>show("pLogin"))}
+}
+</script>
+</body>
+</html>
