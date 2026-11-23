@@ -36,6 +36,11 @@ nav.bottom .bd{position:absolute;top:4px;left:calc(50% + 6px);background:var(--r
 .chips::-webkit-scrollbar{display:none}
 .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 13px;white-space:nowrap;cursor:pointer}
 .chip.on{background:var(--pink);color:#fff;border-color:var(--pink)}
+.vopt{margin:12px 0 4px}.vopt .lb{font-size:13px;color:var(--muted);margin-bottom:6px}.vopt .row{display:flex;flex-wrap:wrap;gap:6px}
+.vchip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer}
+.vchip.on{border:2px solid var(--pink);background:#fde6ec;color:var(--pink-d);padding:6px 13px;font-weight:600}
+.vchip.out{color:#b5afa5;border-style:dashed;text-decoration:line-through}
+.vleft{font-size:13px;color:var(--muted);margin:6px 0 2px}
 .hero{background:linear-gradient(135deg,#fff1d6,#fde6ec);border-radius:16px;padding:14px;margin-bottom:12px}
 .hero b{font-size:17px;display:block}.hero span{font-size:13px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -159,6 +164,31 @@ const st={view:"home",cat:"",q:"",detail:null,dq:1,slip:null,lastCode:null,busy:
 let cart=LS.get("fs:cart",[]), form=LS.get("fs:form",{name:"",phone:"",address:"",note:""});
 const saveCart=()=>{LS.set("fs:cart",cart);badges()};
 const avail=p=>Math.max(0,num(p.qty)-num(p.reserved));
+const vlist=p=>Array.isArray(p&&p.variants)?p.variants:[];
+const hasV=p=>vlist(p).length>0;
+const vtrim=x=>(x||"").trim();
+const vlabel=v=>[vtrim(v.size),vtrim(v.color)].filter(Boolean).join(" · ");
+const vavail=v=>Math.max(0,num(v.qty)-num(v.reserved));
+const vfind=(p,id)=>vlist(p).find(v=>v.id===id)||null;
+/* stock that can still be bought for a cart line (option-level when the product has options) */
+function lavail(p,vid){if(!p)return 0;if(hasV(p)){const v=vfind(p,vid);return v?vavail(v):0}return avail(p)}
+const lkey=l=>l.id+"|"+(l.vid||"");
+function vstate(p){
+  const vs=vlist(p),sizes=[...new Set(vs.map(v=>vtrim(v.size)).filter(Boolean))],colors=[...new Set(vs.map(v=>vtrim(v.color)).filter(Boolean))];
+  const v=vs.find(x=>vtrim(x.size)===(st.vs||"")&&vtrim(x.color)===(st.vc||""))||null;
+  return {vs,sizes,colors,v};
+}
+function vinit(p){
+  const vs=vlist(p);if(!vs.length){st.vs=st.vc="";return}
+  const f=vs.find(v=>vavail(v)>0)||vs[0];st.vs=vtrim(f.size);st.vc=vtrim(f.color);
+}
+function vselect(p,dim,val){
+  const vs=vlist(p);
+  if(dim==="s"){st.vs=val;const ok=vs.find(v=>vtrim(v.size)===val&&vtrim(v.color)===st.vc&&vavail(v)>0);
+    if(!ok){const f=vs.find(v=>vtrim(v.size)===val&&vavail(v)>0)||vs.find(v=>vtrim(v.size)===val);if(f)st.vc=vtrim(f.color)}}
+  else{st.vc=val;const ok=vs.find(v=>vtrim(v.color)===val&&vtrim(v.size)===st.vs&&vavail(v)>0);
+    if(!ok){const f=vs.find(v=>vtrim(v.color)===val&&vavail(v)>0)||vs.find(v=>vtrim(v.color)===val);if(f)st.vs=vtrim(f.size)}}
+}
 const lowOf=p=>p.low!=null&&p.low!==""?num(p.low):(settings.lowStock!=null?num(settings.lowStock):3);
 const payWin=()=>settings.payWindowMin!=null?Math.max(5,num(settings.payWindowMin)):60;
 const shipFee=()=>settings.shipFee!=null?num(settings.shipFee):50;
@@ -213,34 +243,42 @@ function render(){
   else if(st.view==="detail"){
     const p=products.find(x=>x.id===st.detail);
     if(!p||p.active===false){h='<button class="back" data-go="home">‹ หน้าร้าน</button><div class="empty">ไม่พบสินค้านี้</div>'}else{
-    const a=avail(p),inCart=(cart.find(l=>l.id===p.id)||{}).qty||0,maxAdd=Math.max(0,a-inCart),ph=photosOf(p);
+    if(hasV(p)&&!vstate(p).v)vinit(p);
+    const VS=vstate(p),cv=hasV(p)?VS.v:null;
+    const a=hasV(p)?(cv?vavail(cv):0):avail(p),inCart=(cart.find(l=>l.id===p.id&&(l.vid||"")===(cv?cv.id:""))||{}).qty||0,maxAdd=Math.max(0,a-inCart),ph=photosOf(p);
+    const chips=(lbl,dim,vals)=>vals.length?`<div class="vopt"><div class="lb">${lbl}</div><div class="row">${vals.map(x=>{
+      const any=VS.vs.some(v=>vtrim(dim==="s"?v.size:v.color)===x&&vavail(v)>0);const on=(dim==="s"?st.vs:st.vc)===x;
+      return `<button class="vchip ${on?"on":""} ${any?"":"out"}" data-vd="${dim}" data-vv="${esc(x)}" ${any?"":"disabled"}>${esc(x)}${any?"":" · หมด"}</button>`}).join("")}</div></div>`:"";
+    const vhtml=hasV(p)?chips("ไซซ์","s",VS.sizes)+chips(VS.sizes.length?"สี / รุ่น":"ตัวเลือก","c",VS.colors)
+      +`<div class="vleft">${cv?`${esc(vlabel(cv))} · ${a>0?`เหลือ ${a} ชิ้น`:"แบบนี้หมดแล้ว"}`:"แบบนี้ไม่มี ลองเลือกแบบอื่น"}</div>`:"";
     st.dq=Math.max(1,Math.min(st.dq,maxAdd||1));
     h=`<button class="back" data-go="home">‹ หน้าร้าน</button>
       <div class="gal" id="gal">${ph.length?ph.map(id=>`<div class="big" ${img(id,"f")}></div>`).join(""):'<div class="big">📦</div>'}</div>
       ${ph.length>1?`<div class="dots">${ph.map((_,i)=>`<i class="${i===0?"on":""}"></i>`).join("")}</div>`:""}
       <h2 style="margin:12px 0 4px;font-size:19px">${esc(p.name)}</h2><div class="price">${baht(p.price)}</div>
-      <div class="spec">${[["รหัสสินค้า",p.code],["หมวด",p.category],["แบรนด์",settings.capBrand!==false?p.brand:""],["ไซซ์/สี",p.size],["คงเหลือ",a>0?a+" ชิ้น":"หมด"]].filter(r=>r[1]).map(r=>`<div><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join("")}</div>
+      <div class="spec">${[["รหัสสินค้า",p.code],["หมวด",p.category],["แบรนด์",settings.capBrand!==false?p.brand:""],["ไซซ์/สี",hasV(p)?"":p.size],["คงเหลือ",hasV(p)?"":(a>0?a+" ชิ้น":"หมด")]].filter(r=>r[1]).map(r=>`<div><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join("")}</div>
+      ${vhtml}
       ${p.desc?`<p style="white-space:pre-line;margin:12px 0">${esc(p.desc)}</p>`:""}
       ${a>0&&maxAdd>0?`<div class="qty"><span>จำนวน</span><div class="step"><button data-dq="-1">−</button><b>${st.dq}</b><button data-dq="1">＋</button></div></div>`:""}
-      <button class="btn cta" data-add="${esc(p.id)}" ${a>0?"":"disabled"}>${a<=0?"สินค้าหมดชั่วคราว":maxAdd<=0?`✓ อยู่ในตะกร้าครบที่มีแล้ว — ไปที่ตะกร้า`:`🛒 ใส่ตะกร้า ${st.dq} ชิ้น · ${baht(st.dq*num(p.price))}`}</button>
-      <a class="btn lineb" href="${lineMsg("สนใจสินค้านี้ค่ะ\n"+p.name+(p.code?"\nรหัส "+p.code:"")+" · "+baht(p.price)+"\n"+location.origin+location.pathname+"#p-"+p.id)}" target="_blank" rel="noopener">💬 ถามใน LINE</a>
+      <button class="btn cta" data-add="${esc(p.id)}" data-vid="${esc(cv?cv.id:"")}" ${a>0?"":"disabled"}>${a<=0?(hasV(p)?"แบบนี้หมดชั่วคราว":"สินค้าหมดชั่วคราว"):maxAdd<=0?`✓ อยู่ในตะกร้าครบที่มีแล้ว — ไปที่ตะกร้า`:`🛒 ใส่ตะกร้า ${st.dq} ชิ้น${cv?" · "+esc(vlabel(cv)):""} · ${baht(st.dq*num(p.price))}`}</button>
+      <a class="btn lineb" href="${lineMsg("สนใจสินค้านี้ค่ะ\n"+p.name+(cv?" ("+vlabel(cv)+")":"")+(p.code?"\nรหัส "+p.code:"")+" · "+baht(p.price)+"\n"+location.origin+location.pathname+"#p-"+p.id)}" target="_blank" rel="noopener">💬 ถามใน LINE</a>
       <button class="btn ghost" style="width:100%;margin-top:8px" data-sharep="${esc(p.id)}">🔗 คัดลอกลิงก์สินค้านี้</button>`;}
   }
   else if(st.view==="cart"){
     const ls=cart.map(l=>({...l,p:products.find(x=>x.id===l.id)}));
-    const ok=ls.filter(l=>l.p&&l.p.active!==false&&avail(l.p)>0).map(l=>({...l,n:Math.min(l.qty,avail(l.p))}));
+    const ok=ls.filter(l=>l.p&&l.p.active!==false&&lavail(l.p,l.vid)>0).map(l=>({...l,n:Math.min(l.qty,lavail(l.p,l.vid))}));
     const sub=ok.reduce((s,l)=>s+l.n*num(l.p.price),0);
-    h=`<h2 class="h">ตะกร้าสินค้า</h2>${ls.length?ls.map(l=>{if(!l.p)return `<div class="line gone"><div class="th">📦</div><div style="flex:1">สินค้านี้ไม่มีแล้ว</div><button class="x" data-rm="${esc(l.id)}">✕</button></div>`;const a=avail(l.p);
+    h=`<h2 class="h">ตะกร้าสินค้า</h2>${ls.length?ls.map(l=>{if(!l.p)return `<div class="line gone"><div class="th">📦</div><div style="flex:1">สินค้านี้ไม่มีแล้ว</div><button class="x" data-rm="${esc(lkey(l))}">✕</button></div>`;const a=lavail(l.p,l.vid),lv=hasV(l.p)?vfind(l.p,l.vid):null;
       return `<div class="line ${a<=0?"gone":""}"><div class="th" ${img(photosOf(l.p)[0],"t")}>${photosOf(l.p)[0]?"":"📦"}</div>
-        <div style="flex:1;min-width:0"><div class="t">${esc(l.p.name)}</div><div class="d">${a<=0?"⚠️ สินค้าหมดแล้ว":l.qty>a?`⚠️ เหลือแค่ ${a} ชิ้น`:baht(l.p.price)+" / ชิ้น"}</div>
-        <div class="step" style="margin-top:4px"><button data-cq="${esc(l.id)}" data-d="-1">−</button><b>${l.qty}</b><button data-cq="${esc(l.id)}" data-d="1">＋</button></div></div>
-        <b>${baht(Math.min(l.qty,a)*num(l.p.price))}</b><button class="x" data-rm="${esc(l.id)}">✕</button></div>`}).join("")
+        <div style="flex:1;min-width:0"><div class="t">${esc(l.p.name)}</div>${lv?`<div class="d">${esc(vlabel(lv))}</div>`:""}<div class="d">${a<=0?"⚠️ สินค้าหมดแล้ว":l.qty>a?`⚠️ เหลือแค่ ${a} ชิ้น`:baht(l.p.price)+" / ชิ้น"}</div>
+        <div class="step" style="margin-top:4px"><button data-cq="${esc(lkey(l))}" data-d="-1">−</button><b>${l.qty}</b><button data-cq="${esc(lkey(l))}" data-d="1">＋</button></div></div>
+        <b>${baht(Math.min(l.qty,a)*num(l.p.price))}</b><button class="x" data-rm="${esc(lkey(l))}">✕</button></div>`}).join("")
       +`<div class="sum"><div><span>ค่าสินค้า (${ok.reduce((s,l)=>s+l.n,0)} ชิ้น)</span><span>${baht(sub)}</span></div><div><span>ค่าส่ง</span><span>${baht(ok.length?shipFee():0)}</span></div><div class="tot"><span>รวม</span><span>${baht(ok.length?sub+shipFee():0)}</span></div></div>
       <button class="btn cta" data-go="checkout" ${ok.length?"":"disabled"}>ไปกรอกที่อยู่จัดส่ง →</button>`
       :'<div class="empty">ยังไม่มีสินค้าในตะกร้า<br><button class="btn sm yellow" data-go="home" style="margin-top:10px">เลือกสินค้า</button></div>'}`;
   }
   else if(st.view==="checkout"){
-    const ok=cart.map(l=>({...l,p:products.find(x=>x.id===l.id)})).filter(l=>l.p&&avail(l.p)>0).map(l=>({...l,n:Math.min(l.qty,avail(l.p))}));
+    const ok=cart.map(l=>({...l,p:products.find(x=>x.id===l.id)})).filter(l=>l.p&&lavail(l.p,l.vid)>0).map(l=>({...l,n:Math.min(l.qty,lavail(l.p,l.vid))}));
     const tot=ok.reduce((s,l)=>s+l.n*num(l.p.price),0)+shipFee();
     const bankOk=String(settings.bankAcc||"").trim();
     h=`<button class="back" data-go="cart">‹ ตะกร้า</button><h2 class="h">ที่อยู่จัดส่ง</h2>
@@ -310,18 +348,21 @@ function copy(t,label){try{navigator.clipboard.writeText(t).then(()=>toast((labe
 function genCode(){const d=new Date();const ymd=String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
   const ch="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(const x of crypto.getRandomValues(new Uint8Array(4)))r+=ch[x%ch.length];return "FS"+ymd+"-"+r}
 $("view").addEventListener("click",async e=>{
-  const t=e.target.closest("[data-go],[data-cat],[data-p],[data-dq],[data-add],[data-rm],[data-cq],[data-order],[data-slip],[data-copy],[data-install],[data-noinstall],[data-sharep],[data-find],#slipBox");if(!t)return;
+  const t=e.target.closest("[data-vd],[data-go],[data-cat],[data-p],[data-dq],[data-add],[data-rm],[data-cq],[data-order],[data-slip],[data-copy],[data-install],[data-noinstall],[data-sharep],[data-find],#slipBox");if(!t)return;
   if(t.hasAttribute("data-find")){const c=$("fcode").value.trim().toUpperCase(),ph=$("fphone").value.trim();if(!c||!ph){toast("ใส่เลขออเดอร์และเบอร์โทร");return}
     const r=await sb.rpc("fs_my_orders",{p_pairs:[{code:c,phone:ph}]});if(r.error||!r.data||!r.data.length){toast("ไม่พบออเดอร์ ตรวจเลขออเดอร์และเบอร์โทรอีกครั้ง");return}
     if(!myPairs.some(p=>p.code===c))myPairs.push({code:c,phone:ph});saveMy();await loadMine();toast("พบออเดอร์แล้ว");return}
   if(t.dataset.go){go(t.dataset.go);return}
   if(t.dataset.cat!==undefined){st.cat=t.dataset.cat;render();return}
-  if(t.dataset.p){go("detail",{detail:t.dataset.p,dq:1});return}
+  if(t.dataset.vd){const p=products.find(x=>x.id===st.detail);if(p){vselect(p,t.dataset.vd,t.dataset.vv);st.dq=1;render()}return}
+  if(t.dataset.p){const p=products.find(x=>x.id===t.dataset.p);if(p)vinit(p);go("detail",{detail:t.dataset.p,dq:1});return}
   if(t.dataset.dq){st.dq+=+t.dataset.dq;render();return}
-  if(t.dataset.add){const p=products.find(x=>x.id===t.dataset.add);if(!p)return;const l=cart.find(x=>x.id===p.id);const inC=l?l.qty:0;
-    if(inC>=avail(p)){go("cart");return}const n=Math.min(st.dq,avail(p)-inC);if(l)l.qty+=n;else cart.push({id:p.id,qty:n});saveCart();toast(`ใส่ตะกร้า ${n} ชิ้นแล้ว`);st.dq=1;render();return}
-  if(t.dataset.cq){const l=cart.find(x=>x.id===t.dataset.cq),p=products.find(x=>x.id===t.dataset.cq);if(!l||!p)return;l.qty=Math.max(1,Math.min(avail(p)||1,l.qty+(+t.dataset.d)));saveCart();render();return}
-  if(t.dataset.rm){cart=cart.filter(x=>x.id!==t.dataset.rm);saveCart();render();return}
+  if(t.dataset.add){const p=products.find(x=>x.id===t.dataset.add);if(!p)return;const vid=hasV(p)?(t.dataset.vid||""):"";
+    if(hasV(p)&&!vfind(p,vid)){toast("เลือกไซซ์/สีก่อน");return}
+    const l=cart.find(x=>x.id===p.id&&(x.vid||"")===vid);const inC=l?l.qty:0,a=lavail(p,vid);
+    if(inC>=a){go("cart");return}const n=Math.min(st.dq,a-inC);if(l)l.qty+=n;else cart.push(vid?{id:p.id,vid,qty:n}:{id:p.id,qty:n});saveCart();toast(`ใส่ตะกร้า ${n} ชิ้นแล้ว`);st.dq=1;render();return}
+  if(t.dataset.cq){const l=cart.find(x=>lkey(x)===t.dataset.cq);const p=l&&products.find(x=>x.id===l.id);if(!l||!p)return;l.qty=Math.max(1,Math.min(lavail(p,l.vid)||1,l.qty+(+t.dataset.d)));saveCart();render();return}
+  if(t.dataset.rm){cart=cart.filter(x=>lkey(x)!==t.dataset.rm);saveCart();render();return}
   if(t.dataset.copy){copy(t.dataset.copy);return}
   if(t.dataset.sharep){copy(location.origin+location.pathname+fsConnParams()+"#p-"+t.dataset.sharep,"ลิงก์สินค้า ");return}
   if(t.hasAttribute("data-install")){deferredInstall.prompt();deferredInstall=null;render();return}
@@ -336,7 +377,7 @@ async function placeOrder(){
   if(f.phone.replace(/\D/g,"").length<9){toast("เบอร์โทรไม่ถูกต้อง");return}
   st.busy=true;render();
   try{
-    const r=await sb.rpc("fs_place_order",{p_items:cart.map(l=>({id:l.id,qty:l.qty})),p_name:f.name.trim(),p_phone:f.phone.trim(),p_address:f.address.trim(),p_note:(f.note||"").trim()});
+    const r=await sb.rpc("fs_place_order",{p_items:cart.map(l=>(l.vid?{id:l.id,vid:l.vid,qty:l.qty}:{id:l.id,qty:l.qty})),p_name:f.name.trim(),p_phone:f.phone.trim(),p_address:f.address.trim(),p_note:(f.note||"").trim()});
     if(r.error)throw r.error;const res=r.data||{};
     if(!res.ok){st.busy=false;toast("สินค้าในตะกร้าหมดแล้ว");await loadProducts();go("cart");return}
     const code=res.code;myPairs.unshift({code,phone:f.phone.trim()});saveMy();
