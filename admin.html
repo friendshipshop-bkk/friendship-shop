@@ -849,7 +849,7 @@ function renderV(){
     <input data-vk="qty" type="number" inputmode="numeric" min="0" value="${num(v.qty)}"><button class="vx" type="button" data-vdel="${i}" aria-label="ลบตัวเลือก">✕</button>
     ${num(v.reserved)?`<div class="vres">จองในออเดอร์ ${num(v.reserved)} · ขายได้ ${vavail(v)}</div>`:""}</div>`).join(""):"";
   const on=vEdit.length>0;
-  {const fs=$("fSize").closest(".f");if(fs)fs.style.display=on?"none":""}
+  {const fs=$("fSize").closest(".f");if(fs)fs.style.display="none"}
   $("fQty").disabled=on||!canWrite;$("restockBtn").style.display=on||!editing?"none":"";
   if(on){$("fQty").value=vsum(vEdit,"qty");$("restockRow").classList.remove("show")}
   $("qtyLbl").textContent=on?"รวมทุกตัวเลือก":editing?"จำนวนในสต็อก":"จำนวนเริ่มต้น";
