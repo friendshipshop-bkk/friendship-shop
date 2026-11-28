@@ -16,6 +16,7 @@ document.addEventListener("touchmove",e=>{if(e.touches&&e.touches.length>1&&!(e.
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+html,body{overflow-x:clip;max-width:100vw}
 :root{
   --bg:#faf7f0; --card:#fff; --ink:#1f1d1a; --muted:#7a746a; --line:#ebe5d8;
   --accent:#f5b800; --accent-ink:#3a2c00; --green:#1e8e5a; --amber:#c27c00; --grey:#8a857c; --red:#c63d2f; --blue:#2f6fb3;
@@ -1843,7 +1844,7 @@ new MutationObserver(()=>hydrateImgs()).observe(document.body,{childList:true,su
 <script>
 (function(){
   const box=document.getElementById("shopPrev"),fr=document.getElementById("shopPrevFrame");
-  document.getElementById("shopLinkTab").addEventListener("click",e=>{e.preventDefault();fr.src="./?preview=1";box.style.display="flex"});
+  document.getElementById("shopLinkTab").addEventListener("click",e=>{e.preventDefault();fr.src="./?preview=1&t="+Date.now();box.style.display="flex"});
   document.getElementById("shopPrevBack").onclick=()=>{box.style.display="none";fr.src="about:blank"};
 })();
 </script>

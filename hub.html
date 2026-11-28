@@ -135,7 +135,7 @@ async function load(){
     if(r.count){const b=$("bd-shop");b.textContent=r.count+" รอตรวจสลิป";b.style.display=""}}catch(_){}}
   const want=(location.hash.match(/^#(shop|mala)$/)||[])[1];if(want&&allowed.includes(want))open(want);
 }
-function srcOf(a){return a==="shop"?"admin.html":malaUrl}
+function srcOf(a){return a==="shop"?"admin.html?t="+Date.now():malaUrl}
 function open(a){
   if(!allowed.includes(a))return;cur=a;
   if(!frames[a]){const f=document.createElement("iframe");f.src=srcOf(a);f.title=APPS[a].name;
