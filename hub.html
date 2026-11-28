@@ -2,7 +2,11 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, user-scalable=no,viewport-fit=cover">
+<script>/* the app itself does not zoom (pinch or double-tap); photos zoom in the photo viewer */
+document.addEventListener("gesturestart",e=>e.preventDefault(),{passive:false});
+document.addEventListener("touchmove",e=>{if(e.touches&&e.touches.length>1&&!(e.target.closest&&e.target.closest(".lb")))e.preventDefault()},{passive:false});
+</script>
 <title>Friendship แอพรวม</title>
 <meta name="theme-color" content="#1f1b16">
 <link rel="manifest" href="manifest-hub.json">
@@ -13,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
 :root{--bg:#f4efe4;--ink:#1f1b16;--mut:#6f675c;--card:#fff;--line:#e6dfd1;--y:#f5b800;--yd:#7a5800;--ys:#fff4d1;--r:#d8402b;--rd:#8f2414;--rs:#fde5df;--red:#c63d2f}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%}

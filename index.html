@@ -2,7 +2,11 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>/* the app itself does not zoom (pinch or double-tap); photos zoom in the photo viewer */
+document.addEventListener("gesturestart",e=>e.preventDefault(),{passive:false});
+document.addEventListener("touchmove",e=>{if(e.touches&&e.touches.length>1&&!(e.target.closest&&e.target.closest(".lb")))e.preventDefault()},{passive:false});
+</script>
 <title>Friendship Shop</title>
 <meta name="description" content="Friendship Shop — สินค้าพร้อมส่ง สั่งง่ายในแอป">
 <meta name="theme-color" content="#e0567a">
@@ -14,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
 :root{--pink:#e0567a;--pink-d:#c23d62;--ink:#1f1d1a;--muted:#7a746a;--line:#ece6da;--bg:#fff;--soft:#faf7f0;--green:#1e8e5a;--amber:#c27c00;--red:#c63d2f;--r:14px}
 *{box-sizing:border-box}
 html,body{margin:0;background:#f6f2ea;color:var(--ink);font-family:"IBM Plex Sans Thai",system-ui,sans-serif;font-size:15px;-webkit-tap-highlight-color:transparent}
@@ -66,15 +71,7 @@ nav.bottom .bd{position:absolute;top:4px;left:calc(50% + 6px);background:var(--r
 .gal::-webkit-scrollbar{display:none}
 .big{flex:0 0 100%;aspect-ratio:1;max-height:min(380px,38vh);scroll-snap-align:center;background:var(--soft) center/contain no-repeat;display:grid;place-items:center;font-size:60px;color:#d0c7b5}
 .big[data-img]{cursor:zoom-in}
-.lb{position:fixed;inset:0;z-index:200;background:#000;display:flex;flex-direction:column;touch-action:pan-x pan-y}
-.lb .lbt{display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;color:#fff;font-size:15px}
-.lb .lbx{border:0;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;border-radius:50%;font-size:22px;cursor:pointer}
-.lb .lbs{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.lb .lbs::-webkit-scrollbar{display:none}
-.lb .lbp{flex:0 0 100%;scroll-snap-align:center;overflow:auto;display:flex;align-items:center;justify-content:center}
-.lb .lbp img{max-width:100%;max-height:100%;object-fit:contain;transition:width .2s}
-.lb .lbp.z{display:block}.lb .lbp.z img{max-width:none;max-height:none;width:220%}
-.lb .lbh{color:#aaa;font-size:12.5px;text-align:center;padding:8px 0 calc(env(safe-area-inset-bottom) + 12px)}
-@media (prefers-reduced-motion:reduce){.lb .lbp img{transition:none}}
+
 .dots{display:flex;justify-content:center;gap:5px;margin-top:8px}.dots i{width:7px;height:7px;border-radius:50%;background:#ddd3c0}.dots i.on{background:var(--pink)}
 .price{font-size:22px;font-weight:700;color:var(--pink-d)}
 .spec{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
@@ -241,22 +238,50 @@ const imgCache={};
 function imgUrl(k){if(imgCache[k])return imgCache[k];const i=k.indexOf(":"),kind=k.slice(0,i),id=k.slice(i+1);
   return imgCache[k]=sb.storage.from("fs-products").getPublicUrl(id+(kind==="t"?"_t.jpg":".jpg")).data.publicUrl}
 /* full-screen photo viewer: swipe between photos, double-tap to zoom */
+const LBCSS='.lb{position:fixed;inset:0;z-index:2147483000;background:#000;display:flex;flex-direction:column;touch-action:pan-x pan-y}.lb .lbt{display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;color:#fff;font-size:15px}.lb .lbx{border:0;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;border-radius:50%;font-size:22px;cursor:pointer}.lb .lbs{flex:1;display:flex;touch-action:pan-x;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.lb .lbs::-webkit-scrollbar{display:none}.lb .lbp{flex:0 0 100%;scroll-snap-align:center;overflow:hidden;display:flex;align-items:center;justify-content:center}.lb .lbp img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:0 0;will-change:transform;user-select:none;-webkit-user-drag:none}.lb .lbh{color:#aaa;font-size:12.5px;text-align:center;padding:8px 0 calc(env(safe-area-inset-bottom) + 12px)}';
 function openLightbox(keys,start){
-  const box=document.createElement("div");box.className="lb";box.setAttribute("role","dialog");box.setAttribute("aria-label","ดูรูปสินค้า");
+  /* draw on the top page when this shop runs inside the back office or the combined app:
+     iPhone stretches frames to their full height, so a full-screen layer inside a frame ends up off screen */
+  let W=window;try{if(window.top!==window&&window.top.document&&window.top.location.origin===location.origin)W=window.top}catch(_){W=window}
+  const D=W.document;
+  if(!D.getElementById("fs-lb-css")){const st=D.createElement("style");st.id="fs-lb-css";st.textContent=LBCSS;D.head.appendChild(st)}
+  const box=D.createElement("div");box.className="lb";box.setAttribute("role","dialog");box.setAttribute("aria-label","ดูรูปสินค้า");
   box.innerHTML=`<div class="lbt"><span class="lbc">${start+1} / ${keys.length}</span><button class="lbx" aria-label="ปิด">✕</button></div>
     <div class="lbs">${keys.map(k=>`<div class="lbp"><img alt="รูปสินค้า" src="${esc(imgUrl(k))}"></div>`).join("")}</div>
-    <div class="lbh">ปัดซ้าย-ขวาเพื่อดูรูปถัดไป · แตะสองครั้งเพื่อซูม</div>`;
-  document.body.appendChild(box);document.body.style.overflow="hidden";
+    <div class="lbh">ปัดซ้าย-ขวาเพื่อดูรูปถัดไป · ถ่างนิ้วหรือแตะสองครั้งเพื่อซูม</div>`;
+  D.body.appendChild(box);const ov=D.body.style.overflow;D.body.style.overflow="hidden";
   const s=box.querySelector(".lbs"),c=box.querySelector(".lbc");
-  requestAnimationFrame(()=>{s.scrollLeft=start*s.clientWidth});
+  W.requestAnimationFrame(()=>{s.scrollLeft=start*s.clientWidth});
   s.addEventListener("scroll",()=>{c.textContent=(Math.round(s.scrollLeft/s.clientWidth)+1)+" / "+keys.length},{passive:true});
-  const close=()=>{box.remove();document.body.style.overflow="";removeEventListener("keydown",key)};
-  const key=e=>{if(e.key==="Escape")close()};addEventListener("keydown",key);
+  const close=()=>{box.remove();D.body.style.overflow=ov;W.removeEventListener("keydown",key)};
+  const key=e=>{if(e.key==="Escape")close()};W.addEventListener("keydown",key);
   box.querySelector(".lbx").onclick=close;
-  let last=0;s.addEventListener("click",e=>{const p=e.target.closest(".lbp");if(!p)return;const now=Date.now();
-    if(now-last<320){const z=!p.classList.contains("z");p.classList.toggle("z",z);
-      if(z){const r=p.getBoundingClientRect();requestAnimationFrame(()=>{p.scrollLeft=(p.scrollWidth-r.width)/2;p.scrollTop=(p.scrollHeight-r.height)/2})}
-      s.style.overflowX=z?"hidden":"";last=0}else last=now});
+  /* zoom: pinch, double-tap, drag to look around; swipe to the next photo only when not zoomed */
+  const Z={el:null,s:1,x:0,y:0};
+  const setT=(el,sc,x,y)=>{const p=el.parentNode,img=el,pw=p.clientWidth,ph=p.clientHeight,iw=img.offsetWidth*sc,ih=img.offsetHeight*sc;
+    const bx=img.offsetLeft,by=img.offsetTop;
+    const minX=Math.min(0,pw-iw-bx)-bx*0,maxX=Math.max(0,-bx);x=Math.min(Math.max(x,pw-bx-iw),-bx+0);if(iw<=pw)x=(pw-iw)/2-bx;
+    y=Math.min(Math.max(y,ph-by-ih),-by);if(ih<=ph)y=(ph-ih)/2-by;
+    Z.el=el;Z.s=sc;Z.x=x;Z.y=y;el.style.transform=sc===1?"":`translate(${x}px,${y}px) scale(${sc})`;
+    s.style.overflowX=sc>1?"hidden":"";if(sc===1){Z.x=Z.y=0}};
+  const reset=()=>{if(Z.el)setT(Z.el,1,0,0)};
+  s.addEventListener("scroll",()=>{if(Z.el&&Z.s===1)Z.el=null},{passive:true});
+  const zoomAt=(img,sc,cx,cy)=>{const r=img.parentNode.getBoundingClientRect(),ox=cx-r.left,oy=cy-r.top;
+    const cur=Z.el===img?Z:{s:1,x:0,y:0};const k=sc/cur.s;setT(img,sc,ox-(ox-cur.x-img.offsetLeft)*k-img.offsetLeft,oy-(oy-cur.y-img.offsetTop)*k-img.offsetTop)};
+  let pinch=null,pan=null,lastTap=0;
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  s.addEventListener("touchstart",e=>{const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;
+    if(e.touches.length===2){if(Z.el!==img)reset();pinch={img,d:dist(e.touches),s:Z.el===img?Z.s:1};pan=null}
+    else if(e.touches.length===1){const now=Date.now();
+      if(now-lastTap<300){e.preventDefault();const t=e.touches[0];if(Z.el===img&&Z.s>1)reset();else zoomAt(img,2.5,t.clientX,t.clientY);lastTap=0;return}
+      lastTap=now;if(Z.el===img&&Z.s>1)pan={x:e.touches[0].clientX,y:e.touches[0].clientY,ox:Z.x,oy:Z.y}}},{passive:false});
+  s.addEventListener("touchmove",e=>{
+    if(pinch&&e.touches.length===2){e.preventDefault();const t=e.touches,sc=Math.min(4,Math.max(1,pinch.s*dist(t)/pinch.d));
+      zoomAt(pinch.img,sc,(t[0].clientX+t[1].clientX)/2,(t[0].clientY+t[1].clientY)/2)}
+    else if(pan&&e.touches.length===1){e.preventDefault();const t=e.touches[0];setT(Z.el,Z.s,pan.ox+t.clientX-pan.x,pan.oy+t.clientY-pan.y)}},{passive:false});
+  s.addEventListener("touchend",e=>{if(e.touches.length<2)pinch=null;if(!e.touches.length)pan=null;if(Z.el&&Z.s<1.05)reset()});
+  /* mouse / trackpad: double-click to zoom */
+  s.addEventListener("dblclick",e=>{const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;if(Z.el===img&&Z.s>1)reset();else zoomAt(img,2.5,e.clientX,e.clientY)});
 }
 function applyImg(el,u){if(el.tagName==="IMG")el.src=u;else{el.style.backgroundImage=u?`url('${u}')`:"";if(u)el.textContent=el.textContent.replace("📦","")}el.dataset.loaded="1"}
 function hydrate(){if(!sb)return;document.querySelectorAll("[data-img]:not([data-loaded])").forEach(el=>applyImg(el,imgUrl(el.dataset.img)))}

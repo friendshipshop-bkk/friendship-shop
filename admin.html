@@ -2,7 +2,11 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<script>/* the app itself does not zoom (pinch or double-tap); photos zoom in the photo viewer */
+document.addEventListener("gesturestart",e=>e.preventDefault(),{passive:false});
+document.addEventListener("touchmove",e=>{if(e.touches&&e.touches.length>1&&!(e.target.closest&&e.target.closest(".lb")))e.preventDefault()},{passive:false});
+</script>
 <title>หลังร้าน · Friendship Shop</title>
 <link rel="manifest" href="manifest-admin.json">
 <meta name="theme-color" content="#f5b800">
@@ -11,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
 :root{
   --bg:#faf7f0; --card:#fff; --ink:#1f1d1a; --muted:#7a746a; --line:#ebe5d8;
   --accent:#f5b800; --accent-ink:#3a2c00; --green:#1e8e5a; --amber:#c27c00; --grey:#8a857c; --red:#c63d2f; --blue:#2f6fb3;
