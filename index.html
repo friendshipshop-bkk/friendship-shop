@@ -254,10 +254,16 @@ function openLightbox(keys,start){
   const s=box.querySelector(".lbs"),c=box.querySelector(".lbc");
   W.requestAnimationFrame(()=>{s.scrollLeft=start*s.clientWidth});
   s.addEventListener("scroll",()=>{c.textContent=(Math.round(s.scrollLeft/s.clientWidth)+1)+" / "+keys.length},{passive:true});
-  const close=()=>{box.remove();D.body.style.overflow=ov;W.removeEventListener("keydown",key)};
+  let refitRef=null;const close=()=>{box.remove();D.body.style.overflow=ov;W.removeEventListener("keydown",key);if(refitRef)W.removeEventListener("resize",refitRef)};
   const key=e=>{if(e.key==="Escape")close()};W.addEventListener("keydown",key);
   box.querySelector(".lbx").onclick=close;
   /* zoom: pinch, double-tap, drag to look around; swipe to the next photo only when not zoomed */
+  /* size each photo to its real picture area (iPhone otherwise stretches the box and zoom shows empty space) */
+  const fit=img=>{const pp=img.parentNode;if(!img.naturalWidth||!pp.clientWidth)return;const pw=pp.clientWidth,ph=pp.clientHeight,ar=img.naturalWidth/img.naturalHeight;
+    let w=pw,h=w/ar;if(h>ph){h=ph;w=h*ar}img.style.cssText=`width:${w}px;height:${h}px;max-width:none;max-height:none;flex:none;object-fit:fill`};
+  box.querySelectorAll(".lbp img").forEach(img=>{if(img.complete)fit(img);img.addEventListener("load",()=>fit(img))});
+  const refit=()=>{box.querySelectorAll(".lbp img").forEach(img=>{fit(img);img.style.transform=""});Z.el=null;Z.s=1;s.style.overflowX="";s.scrollLeft=Math.round(s.scrollLeft/s.clientWidth)*s.clientWidth};
+  W.addEventListener("resize",refit);refitRef=refit;
   const Z={el:null,s:1,x:0,y:0};
   const setT=(el,sc,x,y)=>{const p=el.parentNode,img=el,pw=p.clientWidth,ph=p.clientHeight,iw=img.offsetWidth*sc,ih=img.offsetHeight*sc;
     const bx=img.offsetLeft,by=img.offsetTop;
@@ -269,9 +275,9 @@ function openLightbox(keys,start){
   s.addEventListener("scroll",()=>{if(Z.el&&Z.s===1)Z.el=null},{passive:true});
   const zoomAt=(img,sc,cx,cy)=>{const r=img.parentNode.getBoundingClientRect(),ox=cx-r.left,oy=cy-r.top;
     const cur=Z.el===img?Z:{s:1,x:0,y:0};const k=sc/cur.s;setT(img,sc,ox-(ox-cur.x-img.offsetLeft)*k-img.offsetLeft,oy-(oy-cur.y-img.offsetTop)*k-img.offsetTop)};
-  let pinch=null,pan=null,lastTap=0;
+  let pinch=null,pan=null,lastTap=0,lastTouch=0;
   const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
-  s.addEventListener("touchstart",e=>{const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;
+  s.addEventListener("touchstart",e=>{lastTouch=Date.now();const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;
     if(e.touches.length===2){if(Z.el!==img)reset();pinch={img,d:dist(e.touches),s:Z.el===img?Z.s:1};pan=null}
     else if(e.touches.length===1){const now=Date.now();
       if(now-lastTap<300){e.preventDefault();const t=e.touches[0];if(Z.el===img&&Z.s>1)reset();else zoomAt(img,2.5,t.clientX,t.clientY);lastTap=0;return}
@@ -282,7 +288,7 @@ function openLightbox(keys,start){
     else if(pan&&e.touches.length===1){e.preventDefault();const t=e.touches[0];setT(Z.el,Z.s,pan.ox+t.clientX-pan.x,pan.oy+t.clientY-pan.y)}},{passive:false});
   s.addEventListener("touchend",e=>{if(e.touches.length<2)pinch=null;if(!e.touches.length)pan=null;if(Z.el&&Z.s<1.05)reset()});
   /* mouse / trackpad: double-click to zoom */
-  s.addEventListener("dblclick",e=>{const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;if(Z.el===img&&Z.s>1)reset();else zoomAt(img,2.5,e.clientX,e.clientY)});
+  s.addEventListener("dblclick",e=>{if(Date.now()-lastTouch<1000)return;const img=e.target.closest(".lbp")&&e.target.closest(".lbp").querySelector("img");if(!img)return;if(Z.el===img&&Z.s>1)reset();else zoomAt(img,2.5,e.clientX,e.clientY)});
 }
 function applyImg(el,u){if(el.tagName==="IMG")el.src=u;else{el.style.backgroundImage=u?`url('${u}')`:"";if(u)el.textContent=el.textContent.replace("📦","")}el.dataset.loaded="1"}
 function hydrate(){if(!sb)return;document.querySelectorAll("[data-img]:not([data-loaded])").forEach(el=>applyImg(el,imgUrl(el.dataset.img)))}
